@@ -24,7 +24,7 @@ Steps 7a + 7c code-complete. Revalidated and hardened 2026-09-26 — five
 blockers found and fixed.**
 
 ⚠ **The app has never been run on a phone by anyone.** Every claim below is
-typechecker-and-`checks/`-deep. `npm run check` → 27 suites, `tsc` exit 0,
+typechecker-and-`checks/`-deep. `npm run check` → 28 suites, `tsc` exit 0,
 36 files uncommitted.
 
 | Step | Status | What landed |
@@ -265,6 +265,53 @@ Ranked by what a tester actually hits.
 13. `getTodaysWorkout` in `src/constants/workouts.ts` is dead and still
     contains a `throw` inside render. `Equipment` and `motivationalMessages`
     are its only live exports; move them and delete the rest.
+
+## Weight and battery (2026-09-29)
+
+Measured, not guessed. Four regressions, all removed; `checks/weight.ts` now
+budgets them so they cannot creep back.
+
+**Bundled data: 788 KB → 184 KB.** `exerciseInstructions.json` was **593 KB
+with zero consumers.** The `require` was lazy so it only PARSED on demand, but
+Metro bundles a static require regardless — every tester shipped it and nobody
+could read it. Before deleting I measured what the scheduler can actually
+prescribe across 1,200 persona combinations: **39 of 743 exercises**, and 33 of
+those are canonical lifts whose names explain themselves (Barbell Squat, Bench
+Press, Romanian Deadlift, Chin-Up). About six need a word — Thigh Abductor,
+Air Bike, Cable Crunch, Glute Kickback.
+
+That also **corrects the advice I gave an hour earlier**, where I ranked
+exercise instructions as high-impact. 593 KB to explain six names is weight,
+not a feature. If it is wanted later: instructions for all 39 reachable
+exercises are **34 KB**, for the ambiguous six under **5 KB**, and the source
+(free-exercise-db) is public domain, so it is a script, not a migration.
+
+**`react-native-reanimated` removed.** Zero imports, no babel plugin
+configured, nothing in the tree depending on it — a native module shipping for
+nothing. Note that `react-native-screens` and `react-native-gesture-handler`
+look equally unused by grep and are NOT: both are peer dependencies of
+`@react-navigation/stack`. `react-native-get-random-values` is likewise a bare
+side-effect import in `index.js`. A dependency audit by grep alone would have
+broken navigation.
+
+**The rest timer is gone**, which is where it should have gone on 2026-09-24
+when the founder said *"you do not know if in the gym or other place only he is
+the one on the machine... not everyone's pace is same"*. It was noted in the
+checklist and left wired for five days. It was also the only thing re-rendering
+the workout screen between taps: a 250 ms interval, **four full re-renders a
+second** for the length of every rest.
+
+**The day-rollover watcher: 1,440 wake-ups a day → at most 48.** I introduced
+`setInterval(check, 60_000)` to catch the 4am boundary. The boundary time is
+known exactly, so it now schedules a single `setTimeout` for it (capped at 30
+min per hop, because JS timers drift once the device sleeps) and the AppState
+listener catches a boundary crossed while the process was asleep. **There is
+now no `setInterval` anywhere outside `src/dev/seed.ts`.**
+
+⚠ **`src/dev/` is misleadingly named.** `backup.ts`, `digest.ts` and
+`exportFile.ts` are all production code reached from HomeScreen; only `seed.ts`
+is dev-only. Excluding the whole directory made `checks/weight.ts` report
+`expo-file-system` and `expo-sharing` as unused dependencies on its first run.
 
 ## The feedback loop, closed (2026-09-29)
 
@@ -747,7 +794,7 @@ Something close to:
 > A six-reviewer revalidation on 2026-09-26 found five blockers, all fixed and
 > verified (see that section) — the app is now passable end to end in logic,
 > but **it has still never been run on a phone by anyone.**
-> `npm run check` → 27 suites. Nothing is committed.
+> `npm run check` → 28 suites. Nothing is committed.
 > Two decisions are waiting on you: (1) `expo-file-system` + `expo-sharing` for
 > a restorable backup, which gates turning off the Google auto-backup of the
 > event log; (2) whether the four-week AI unlock ships to testers at all — two
@@ -763,7 +810,7 @@ Then wait.
 ```bash
 cd FitMVP
 npm install
-npm run check       # tsc --noEmit && ./checks/run.sh — expect: 27 passed, 0 failed
+npm run check       # tsc --noEmit && ./checks/run.sh — expect: 28 passed, 0 failed
 ```
 
 `npm run check` is the gate. It needs no test runner — `tsx` arrives as a

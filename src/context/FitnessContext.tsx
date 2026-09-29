@@ -450,16 +450,39 @@ export const FitnessProvider: React.FC<{ children: ReactNode }> = ({ children })
   // force-quit the only cure and nothing on screen to suggest it.
   const [dayTick, setDayTick] = useState(() => trainingDayOf(new Date(), rolloverHour));
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
     const check = () => {
       const d = trainingDayOf(new Date(), rolloverHour);
       setDayTick((prev) => (prev === d ? prev : d));
     };
+
+    /**
+     * Wake ONCE, when the boundary actually arrives.
+     *
+     * This was `setInterval(check, 60_000)` — 1,440 wake-ups a day to notice a
+     * single moment, each one dragging the JS thread out of idle. The rollover
+     * time is known exactly, so schedule for it: one timer per day, and the
+     * AppState listener covers the case where the process was asleep through
+     * it. Capped at 30 min per hop because JS timers drift badly once the
+     * device sleeps, so a long one cannot be trusted to fire on time.
+     */
+    const scheduleNext = () => {
+      const now = new Date();
+      const next = new Date(now);
+      next.setHours(rolloverHour, 0, 5, 0);
+      if (next <= now) next.setDate(next.getDate() + 1);
+      const wait = Math.min(next.getTime() - now.getTime(), 30 * 60 * 1000);
+      timer = setTimeout(() => { check(); scheduleNext(); }, Math.max(1000, wait));
+    };
+
     const sub = AppState.addEventListener('change', (st: AppStateStatus) => {
-      if (st === 'active') check();
+      // Returning to the app is when a missed boundary gets noticed — and it
+      // is when it matters, because nothing on screen is read while away.
+      if (st === 'active') { check(); if (timer) clearTimeout(timer); scheduleNext(); }
     });
-    // Covers the app being left open and in the foreground across 4am.
-    const timer = setInterval(check, 60_000);
-    return () => { sub.remove(); clearInterval(timer); };
+    scheduleNext();
+    return () => { sub.remove(); if (timer) clearTimeout(timer); };
   }, [rolloverHour]);
 
   // ── Derived reads ──────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 import {
   EXERCISES, getExercise, exerciseName, canonicalExerciseId, isAvailable,
-  loadsInjury, filterExercises, findSubstitutes, findNonSoreAlternatives, getInstructions,
+  loadsInjury, filterExercises, findSubstitutes, findNonSoreAlternatives,
   filterExercises as FE,
 } from '../src/data/exercises';
 import { exerciseIdOf } from '../src/session/scheduler';
@@ -79,11 +79,9 @@ const beg = filterExercises({ tier: 'home', maxLevel: 'beginner' });
 check(`${beg.length} beginner-safe bodyweight exercises`, beg.length > 20, String(beg.length));
 check('no expert movements', !beg.some(e => e.lvl === 'expert'));
 
-console.log('\nInstructions load lazily');
-const ins = getInstructions('bench-press');
-check('bench press has instructions', ins.length > 0, String(ins.length));
-check('legacy id resolves to instructions', getInstructions('push-ups').length > 0);
-console.log(`  → "${ins[0]?.slice(0, 80)}…"`);
+// Instructions were removed 2026-09-29: 593 KB bundled with zero consumers,
+// for a set where only 39 of 743 exercises are ever prescribed and 33 of those
+// are canonical lifts that explain themselves. See src/data/exercises.ts.
 
 // ── owned equipment widens the home tier ──
 console.log('\nOwned equipment (Meera\'s £180 of dumbbells)');

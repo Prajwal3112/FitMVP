@@ -27,7 +27,6 @@ const KNOWN_ORPHANS = new Set([
   // Built for features that exist on the checklist and are not wired yet.
   'selectScheduleAdvice', 'ScheduleAdvice',          // 4.8 — never reaches a screen
   'findSubstitutes', 'findSubstitutesTiered', 'findNonSoreAlternatives', // 2.5 mid-session swap
-  'getInstructions',                                 // 607 KB bundled, no UI
   'successFraming', 'progressionStyle', 'goalFeasibility', 'progressionMode',
   'isCalibrationSession', 'lastPerformance', 'exerciseIdOf',
   'draftGoalRevised', 'draftSessionResumed', 'draftExerciseSubstituted',

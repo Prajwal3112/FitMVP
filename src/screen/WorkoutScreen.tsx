@@ -7,7 +7,6 @@ import { colors } from '../constants/colors';
 import { DROP_REASON } from '../constants/copy';
 import { typography } from '../constants/typography';
 import { ExerciseLogCard, type LogSetArgs } from '../components/ExerciseLogCard';
-import { RestTimerBar, useRestTimer } from '../components/RestTimer';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { motivationalMessages } from '../constants/workouts';
 import { useFitness } from '../context/FitnessContext';
@@ -23,7 +22,6 @@ export default function WorkoutScreen({
     beginSession, recordSet, dropExercise, finishSession, skipToday,
   } = useFitness();
 
-  const timer = useRestTimer();
 
   const [confirmSkip, setConfirmSkip] = useState<boolean>(false);
   const [busy, setBusy] = useState<boolean>(false);
@@ -79,18 +77,15 @@ export default function WorkoutScreen({
   const loggedCount = new Set(working.map((s) => s.exerciseId)).size;
   const canFinish = working.length > 0;
 
+  // The rest timer was removed 2026-09-29 on the founder's instruction of
+  // 2026-09-24 — "you do not know if in the gym or other place only he is the
+  // one on the machine... not everyone's pace is same". It was noted in the
+  // checklist and left wired for five days. It was also the only reason this
+  // screen re-rendered between taps: a 250 ms interval, four full re-renders a
+  // second for the length of every rest, to display a number the user did not
+  // ask for.
   const handleLogSet = (exerciseId: string) => (args: LogSetArgs) => {
-    const alreadyLogged = session.setLog.some(
-      (s) => s.exerciseId === exerciseId &&
-        s.setIndex === args.setIndex &&
-        s.isWarmup === (args.isWarmup === true),
-    );
     void recordSet({ sessionId: session.sessionId, exerciseId, ...args })
-      .then(() => {
-        // Only a *new* working set starts the clock — editing a logged
-        // set or rating it shouldn't restart your rest.
-        if (!alreadyLogged && args.isWarmup !== true) timer.start();
-      })
       .catch((e: unknown) => {
         Alert.alert("Couldn't log that set", e instanceof Error ? e.message : String(e));
       });
@@ -349,7 +344,6 @@ export default function WorkoutScreen({
           </View>
         )}
       </ScrollView>
-      {!confirmSkip && <RestTimerBar timer={timer} />}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

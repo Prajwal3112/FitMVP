@@ -255,15 +255,21 @@ export function findNonSoreAlternatives(
     .slice(0, limit ?? 8);
 }
 
-// ─── Instructions (lazy) ─────────────────────────────────────────────
-
-let instructionCache: Record<string, string[]> | null = null;
-
-/** Loads the 539 KB instruction file on first use only. */
-export function getInstructions(id: string): string[] {
-  if (instructionCache === null) {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    instructionCache = require('./exerciseInstructions.json') as Record<string, string[]>;
-  }
-  return instructionCache[canonicalExerciseId(id)] ?? [];
-}
+// ─── Instructions: REMOVED 2026-09-29 ────────────────────────────────
+//
+// `exerciseInstructions.json` was 593 KB of bundled text with zero
+// consumers. The `require` was lazy, so it only PARSED on demand — but
+// Metro bundles a static require regardless, so every tester shipped it and
+// nobody could ever read it.
+//
+// Measured before deleting, across 1,200 persona combinations: only 39 of
+// 743 exercises are ever prescribed, and 33 of those are canonical lifts
+// whose names explain themselves — Barbell Squat, Bench Press, Romanian
+// Deadlift, Chin-Up. About six need a word of explanation ("Thigh
+// Abductor", "Air Bike", "Cable Crunch", "Glute Kickback").
+//
+// 593 KB to explain six names is not a feature, it is weight. If
+// instructions are wanted later, generate a file for the reachable set —
+// instructions for all 39 are 34 KB, and for the ambiguous six, under 5 KB.
+// The source data is free-exercise-db (public domain); re-importing is a
+// script, not a migration.
