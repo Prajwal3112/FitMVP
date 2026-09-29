@@ -1,19 +1,20 @@
 import React, { useEffect, useRef } from 'react';
 import {
-  View, Text, StyleSheet, SafeAreaView,
-  Animated, ScrollView,
+  View, Text, StyleSheet, Animated, ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../constants/colors';
 import { typography } from '../constants/typography';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { motivationalMessages } from '../constants/workouts';
 import { useFitness } from '../context/FitnessContext';
+import { workingSets } from '../projections/sessions';
 import type { RootStackScreenProps } from '../navigation/types';
 
 export default function CompletionScreen({
   navigation,
 }: RootStackScreenProps<'Completion'>): React.ReactElement {
-  const { userData, currentDay, streak, history } = useFitness();
+  const { userData, currentDay, streak, adherence, lastCompletedSession } = useFitness();
   const completedDay = currentDay - 1;
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -26,20 +27,26 @@ export default function CompletionScreen({
     }).start();
   }, [fadeAnim]);
 
-  const goalJustHit = streak === 3;
-  const pastGoal = streak > 3;
+  const goalJustHit = streak.totalCompleted === 3;
+  const pastGoal = streak.totalCompleted > 3;
 
   const completionMessages = motivationalMessages.completion;
   const fallbackIndex = completedDay % completionMessages.length;
   const fallbackMessage = completionMessages[fallbackIndex] ?? completionMessages[0]!;
 
-  const heroSub = goalJustHit
-    ? 'You hit the goal. Three days in a row.'
-    : pastGoal
-      ? "Past Day 3. This is who you are now."
-      : fallbackMessage;
+  // The session's own summary is the honest thing to lead with; the
+  // canned line is the fallback when no summary was generated.
+  const heroSub = lastCompletedSession?.summary
+    ?? (goalJustHit
+      ? 'You hit the goal. Three days in a row.'
+      : pastGoal
+        ? "Past Day 3. This is who you are now."
+        : fallbackMessage);
 
-  const adherencePercent = Math.round((streak / Math.max(history.length, 1)) * 100);
+  const highlights = lastCompletedSession?.highlights ?? [];
+  const setsToday = lastCompletedSession
+    ? workingSets(lastCompletedSession.setLog).length
+    : 0;
 
   const handleContinue = () => {
     navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
@@ -65,18 +72,41 @@ export default function CompletionScreen({
         <Text style={styles.section}>STATS</Text>
         <View style={styles.group}>
           <View style={[styles.cell, styles.border]}>
-            <Text style={styles.cellLabel}>Streak</Text>
-            <Text style={styles.cellValue}>{streak}</Text>
+            <Text style={styles.cellLabel}>Last 4 weeks</Text>
+            <Text style={styles.cellValue}>
+              {adherence.completed} of {adherence.expected}
+            </Text>
           </View>
           <View style={[styles.cell, styles.border]}>
-            <Text style={styles.cellLabel}>Adherence</Text>
-            <Text style={styles.cellValue}>{adherencePercent}%</Text>
+            <Text style={styles.cellLabel}>Sessions logged</Text>
+            <Text style={styles.cellValue}>{streak.totalCompleted}</Text>
           </View>
           <View style={styles.cell}>
-            <Text style={styles.cellLabel}>Days logged</Text>
-            <Text style={styles.cellValue}>{history.length}</Text>
+            {/* "Best run" used to sit here showing streak.longest, which is
+                always identical to totalCompleted — a skip doesn't reset the
+                run, by design. Two tiles with the same number under
+                different labels reads as broken. Sets is a real number the
+                other two don't already say. */}
+            <Text style={styles.cellLabel}>Sets today</Text>
+            <Text style={styles.cellValue}>{setsToday}</Text>
           </View>
         </View>
+
+        {highlights.length > 0 && (
+          <>
+            <Text style={styles.section}>HIGHLIGHTS</Text>
+            <View style={styles.group}>
+              {highlights.map((h, i) => (
+                <View
+                  key={h}
+                  style={[styles.whyCell, i < highlights.length - 1 && styles.border]}
+                >
+                  <Text style={styles.highlightText}>{h}</Text>
+                </View>
+              ))}
+            </View>
+          </>
+        )}
 
         {!!userData.why && (
           <>
@@ -95,7 +125,7 @@ export default function CompletionScreen({
           style={styles.cta}
         />
 
-        {streak >= 7 && (
+        {streak.totalCompleted >= 7 && (
           <Text style={styles.footnote}>
             7 days logged. You've built the habit.
           </Text>
@@ -178,6 +208,7 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     lineHeight: 22,
   },
+  highlightText: { fontSize: 15, color: colors.text, lineHeight: 21 },
   cta: { marginTop: 32 },
   footnote: {
     fontSize: 13,

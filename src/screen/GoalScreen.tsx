@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import {
-  View, Text, TextInput, ScrollView, StyleSheet,
-  SafeAreaView, KeyboardAvoidingView, Platform,
+  View, Text, TextInput, ScrollView, StyleSheet, KeyboardAvoidingView, Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../constants/colors';
 import { typography } from '../constants/typography';
 import { PrimaryButton } from '../components/PrimaryButton';
@@ -33,7 +33,12 @@ export default function GoalScreen({
     setSubmitting(true);
     try {
       await submitGoal(goal, why.trim());
-      navigation.goBack();
+      // NOT goBack(). Onboarding resets the stack to [Goal], so on the
+      // first run there is nothing behind this screen and goBack() is a
+      // silent no-op — the tester taps Save, nothing happens, and taps
+      // again, appending a duplicate GoalCreated. Reset to Home instead;
+      // it is correct both on first run and when editing later.
+      navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
     } catch (e) {
       setSubmitError(e instanceof Error ? e.message : String(e));
     } finally {

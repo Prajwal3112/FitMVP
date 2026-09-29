@@ -1,5 +1,7 @@
 import type { Event } from '../events';
-import type { Profile, Routine, EquipmentTier, Constraints } from '../events/userContext';
+import type {
+  Profile, Routine, EquipmentTier, Constraints, Experience, OwnedEquipment,
+} from '../events/userContext';
 
 // ─── Projection state ────────────────────────────────────────────────
 // The "current view" of who the user is. Derived from events, never set directly.
@@ -12,6 +14,8 @@ export type UserContextProjection = {
   constraints: Constraints | null;
   knownInjuries: string[];
   dayRolloverHour: number;
+  experience: Experience | null;
+  ownedEquipment: OwnedEquipment[];
   lastSeq: number;            // last event seq folded into this state
 };
 
@@ -23,6 +27,8 @@ export const INITIAL_USER_CONTEXT: UserContextProjection = {
   constraints: null,
   knownInjuries: [],
   dayRolloverHour: 4,
+  experience: null,
+  ownedEquipment: [],
   lastSeq: -1,
 };
 
@@ -43,6 +49,8 @@ export function applyUserContextEvent(
       constraints: event.payload.constraints,
       knownInjuries: event.payload.knownInjuries,
       dayRolloverHour: event.payload.dayRolloverHour,
+      experience: event.payload.experience ?? null,
+      ownedEquipment: event.payload.ownedEquipment ?? [],
       lastSeq: event.seq,
     };
   }
@@ -61,6 +69,25 @@ export function applyUserContextEvent(
         break;
       case 'dayRolloverHour':
         if (typeof after === 'number') next.dayRolloverHour = after;
+        break;
+      case 'experience':
+        if (typeof after === 'string') next.experience = after as Experience;
+        break;
+      case 'equipment':
+        if (typeof after === 'string') next.equipment = after as EquipmentTier;
+        break;
+      case 'constraints.sessionMaxMinutes':
+        if (typeof after === 'number' && next.constraints) {
+          next.constraints = { ...next.constraints, sessionMaxMinutes: after };
+        }
+        break;
+      case 'ownedEquipment':
+        if (Array.isArray(after)) next.ownedEquipment = after as OwnedEquipment[];
+        break;
+      case 'constraints.daysPerWeek':
+        if (typeof after === 'number' && next.constraints) {
+          next.constraints = { ...next.constraints, daysPerWeek: after };
+        }
         break;
       default:
         // Unknown field — log via dev tools but don't crash the projection.

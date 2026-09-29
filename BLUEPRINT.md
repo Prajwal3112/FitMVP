@@ -494,6 +494,22 @@ That's the trick. Day 1 isn't in the prompt as raw events. It's been distilled i
 - Nutrition
 - Sleep tracking
 
+### Deferred out of v1 — decided 2026-09-24
+
+> Specs below stay in this document. They are **off the critical path**, not deleted.
+> Rule applied: *if it only pays off after 6 months of user data and there are 0 users, it is not on the critical path.*
+
+| Deferred | Where specced | Why it's off the path |
+|---|---|---|
+| Hybrid retrieval: sqlite-vec + FTS5 + RRF + MiniLM embeddings | Part 7, Part 8 | ~3 weeks of work over an empty corpus. A year of daily sessions is 365 rows — a linear scan. Pays off in year two |
+| Semantic-fact lifecycle (confidence decay, contradiction, retirement) | ARCHITECTURE §6, §2 | Three event types and a state machine for a feature no user has asked for |
+| 4-tier digest hierarchy (weekly → monthly → block → arc) | Part 7 compression cadence | Only the session summary fires before week 4. Build that one; stub the rest |
+| Tiered provider fallback chain (Groq → Cerebras → Gemini) | Part 6, Weakness 7 | Resilience engineering for a rate limit one user will never hit. A gateway (e.g. OpenRouter) would remove the need entirely |
+| `SessionResumed` / `abandoned` detection / AppState ≥4h (Step 7b) | ARCHITECTURE §7 | Rare edge case, real complexity. The *long* gap (Scenario F) matters enormously; the 4-hour gap does not |
+| On-device LLM migration | Part 1 | Correct eventual direction, zero value now |
+
+**What moved onto the path instead:** the re-entry engine and the return-after-a-lapse flow (ARCHITECTURE §9 Scenario F). That is the stated success criterion — *"even though they lose the streak, they can still continue"* — and both user-research personas independently named it as the only thing they would pay for.
+
 ---
 
 ## Sources used in this finalization
@@ -677,6 +693,8 @@ The hierarchical-projections approach in Part 4 was right but under-specified. H
 
 ## Retrieval algorithm: hybrid BM25 + vector + RRF
 
+> ⏸️ **DEFERRED out of v1 (2026-09-24).** See Part 5 → "Deferred out of v1". Spec retained.
+
 When the LLM calls `recallEpisode(query)`:
 
 ```
@@ -731,6 +749,8 @@ Every prompt has this shape:
 What to use so the app stays small (<60MB total) and snappy.
 
 ## Embedding model — locked
+
+> ⏸️ **DEFERRED out of v1 (2026-09-24)** along with the vector/keyword index and RRF below. Spec retained.
 
 **`all-MiniLM-L6-v2` (ONNX, quantized INT8)**
 - Size: ~6MB quantized (22MB FP32)
@@ -865,7 +885,7 @@ This stays under typical 100 MB cellular download warnings on iOS and Android. I
 
 ## ✅ What holds up
 
-- **Event sourcing model** — the 32-event catalog reads as exhaustive without being silly. The 8 domain groups map cleanly to the lifecycle.
+- **Event sourcing model** — the event catalog reads as exhaustive without being silly. The 8 domain groups map cleanly to the lifecycle. (Count settled at **31** after Refinement 2 folded the LLM meta events and Step 7a added the missing `SessionResumed`.)
 - **Tool count of 10** — over the "5-8" guideline but each tool is distinct, has a deterministic fallback, and has a clear "when it fires" rule. Acceptable.
 - **`recallEpisode` as a non-LLM tool** — clean. The LLM can invoke it; the implementation is pure local retrieval (FTS5 + sqlite-vec + RRF). No tension.
 - **Deterministic fallbacks** — every tool has one. The app works fully offline. This is the strongest single design decision in the system.
@@ -880,7 +900,7 @@ This stays under typical 100 MB cellular download warnings on iOS and Android. I
 
 ### Refinement 2: LLM meta events can consolidate
 **Issue:** `LLMSuggestionAccepted` + `LLMSuggestionRejected` overlap with `LLMCallObserved`. Three events when one with a `status` field would do.
-**Proposal:** keep `LLMCallObserved` only; add `outcome: 'accepted' | 'rejected_user' | 'rejected_validator' | 'rejected_safety' | 'fallback_used'` to its payload. Drops the catalog from 32 → 30.
+**Proposal:** keep `LLMCallObserved` only; add `outcome: 'accepted' | 'rejected_user' | 'rejected_validator' | 'rejected_safety' | 'fallback_used'` to its payload. Drops the catalog by two.
 **Impact:** small but it's the "don't add events when fields will do" principle. **Do this before any code.**
 
 ### Refinement 3: Stacked digest generation at week/month boundaries

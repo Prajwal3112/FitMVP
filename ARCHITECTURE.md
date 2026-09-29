@@ -12,8 +12,8 @@
 - **Single-user assumption?** Yes for v1. Multi-device sync explicitly out of scope.
 - **Target platforms:** iOS / Android (Expo SDK 54+)
 - **Target launch:** local-only MVP (cloud LLM) → on-device LLM as v2
-- **Document version:** v0.3 — sections 0–8 locked from BLUEPRINT.md
-- **Last updated:** 2026-06-07
+- **Document version:** v0.4 — sections 0–8 locked; session family amended in Step 7a
+- **Last updated:** 2026-09-21
 - **Companion doc:** see `BLUEPRINT.md` for tech stack, lifecycle walkthrough, red-team, and locked algorithms.
 
 ---
@@ -174,7 +174,9 @@ type SessionScheduled = BaseEvent & {
   payload: {
     sessionId: string;
     trainingDay: string;
-    planId: string;
+    planId: string | null;         // null = pre-planner static template rotation
+    workoutId: string;             // which template/plan-session this came from
+    workoutName: string;           // display title; no plan to derive one from yet
     exercises: ExerciseSlot[];     // ordered, w/ RPE targets
     openingNote: string;           // LLM or fallback
     generationMode: 'llm_styled' | 'template_fallback';
@@ -184,6 +186,11 @@ type SessionScheduled = BaseEvent & {
 type SessionStarted = BaseEvent & {
   type: 'SessionStarted';
   payload: { sessionId: string; startedAt: string };
+};
+
+type SessionResumed = BaseEvent & {
+  type: 'SessionResumed';
+  payload: { sessionId: string; resumedAt: string; idleMinutes: number };
 };
 
 type PreCheckinRecorded = BaseEvent & {
@@ -204,6 +211,7 @@ type SetCompleted = BaseEvent & {
     setIndex: number;
     weight_kg: number;
     reps: number;
+    durationSec?: number;          // hold-based work (planks etc.); reps is 0 there
     rpe?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
     rir?: 0 | 1 | 2 | 3 | 4 | 5;
   };
@@ -371,7 +379,7 @@ type LLMCallObserved = BaseEvent & {
 };
 ```
 
-**Total: 30 events across 8 domains.** Above the "15–25" rule but each represents a distinct domain action. `LLMSuggestionAccepted`/`Rejected` were folded into `LLMCallObserved.outcome` per BLUEPRINT Part 11 Refinement 2.
+**Total: 31 events across 8 domains.** Above the "15–25" rule but each represents a distinct domain action. `LLMSuggestionAccepted`/`Rejected` were folded into `LLMCallObserved.outcome` per BLUEPRINT Part 11 Refinement 2. `SessionResumed` was added in Step 7a — §7's state machine had emitted it since v0.3 without it existing in this catalog.
 
 ---
 
@@ -784,7 +792,7 @@ transitions:
 - **Clock skew / timezone changes** → all events stamp `trainingDay` at write-time using `trainingDayOf(now, userRolloverHour)`. Timezone is the *device's* timezone at the moment of write. Travel produces deterministic, traceable behavior.
 - **User opens app for first time in 14 days** → `TodaysSession` projection notices gap > 2 days. Triggers `RestartFlow` UI (not a state of the session machine — sits *above* it). Asks "ease back in / resume normal / replan." Flow then creates the appropriate session.
 - **LLM returns invalid JSON** → retry with error feedback (max 3). If exhausted → deterministic fallback fires.
-- **LLM output violates invariant** → reject, emit `LLMSuggestionRejected { reason: 'validator_rejected' }`, retry once with rejection feedback, then fallback.
+- **LLM output violates invariant** → reject, emit `LLMCallObserved { outcome: 'rejected_validator' }`, retry once with rejection feedback, then fallback.
 
 ---
 
@@ -822,7 +830,7 @@ transitions:
 
 **LLM observability**
 10. Every LLM tool invocation must emit one `LLMCallObserved` event, regardless of success.
-11. Every accepted LLM suggestion must reference its `callId` via `LLMSuggestionAccepted`.
+11. Every accepted LLM suggestion must be traceable to its `callId` via the `LLMCallObserved` event carrying `outcome: 'accepted'`.
 
 **Event log integrity**
 12. Every event must have a valid `prevHash` chaining to the previous event by `seq`. A broken chain means tampering or corruption → app enters read-only debug mode.
@@ -871,7 +879,50 @@ transitions:
 
 ### Scenario E: The mid-block goal change
 
-### Scenario F: The cold restart (14 days dormant)
+### Scenario F: The cold restart (long dormancy)
+
+> **Drafted 2026-09-24 from the founder's own framing** — *"suppose a streak is lost for a very long time, but we cannot start from where we left since there was a long gap; this gap too depends whether to restart or continue with changes from where you left."*
+> Marked as draft until reviewed. Scenarios A–E, G, H remain open.
+
+- **Setup:** User trained 14 times across 3 weeks, then stopped. Opens the app N days later. Last completed session has logged loads. The first few days of the gap may carry `SessionSkipped.reason`.
+
+- **Core principle:** *Re-entry is graded, not binary.* "Restart vs continue" is the wrong frame. The app computes a load and volume multiplier from gap length, then modifies it by **why** the gap happened.
+
+- **Deterministic, not an LLM judgement:**
+  ```ts
+  reentryPolicy(gapDays, skipReasons, trainingAgeBeforeGap, lastLoads)
+    → { mode: 'continue' | 'ease_back' | 'rebuild' | 'restart',
+        loadMultiplier, volumeMultiplier, rampWeeks }
+  ```
+  Code decides the numbers. The LLM writes the sentence explaining them. It never picks the number. (Consistent with §10 Q1.)
+
+- **Gap bands:**
+
+  | Gap | What actually changed | Mode | Load |
+  |---|---|---|---|
+  | 1–3 days | Nothing. This is a rest day | `continue` | 100% — **say nothing at all** |
+  | 4–10 days | Nothing measurable. Feels rusty, isn't | `continue` | 100% |
+  | 11–21 days | ~5% strength, work capacity down | `ease_back` | ~90–95%, normal within a week |
+  | 22–56 days | ~10–15% strength; muscle mass barely moved | `ease_back` | ~85%, ramp 2–3 weeks |
+  | 57–120 days | Real loss, but muscle memory makes regain fast | `rebuild` | ~75%, ramp 3–4 weeks |
+  | 120+ days | New block, not a new lifter | `restart` | Fresh plan, conservative start, fast progression |
+
+- **Why the ramp exists:** connective tissue deconditions more slowly than muscle *and* re-adapts more slowly. Post-layoff injuries come from doing too much on day one, not from being weak. The ramp protects tendons, not ego — and the app should say so.
+
+- **Skip-reason modifiers** (`SessionSkipped.reason`, already captured):
+  - `illness` → more conservative than gap length alone implies; the body genuinely changed
+  - `injury` → **do not use this flow.** Route to the injury path (Scenario B)
+  - `travel` → least loss of any category; likely walking all day
+  - `unmotivated` / `time` → **no physiological modifier.** The body barely changed. The problem is the story, and the response is *proof of retention*, not sympathy
+
+- **Expected behaviour:**
+  - Gaps ≤3 days are never mentioned. Naming a rest day as a lapse manufactures guilt.
+  - The app **states the gap plainly** — "You've been away nine days." No "Welcome back!", no question marks, no emoji, no pretending it didn't happen. Silence about an absence teaches the user the app wasn't watching.
+  - It **reframes with evidence from the log before offering a path**: "Before that you trained fourteen times in three weeks. That's the pattern. Nine days is the exception."
+  - The recommended session is **already adjusted when it's shown**. The user is never asked to negotiate their own workout down while feeling bad — the decision is taken away and the bar is pre-lowered.
+  - **Three exits, all forward:** the computed recommendation (primary), a lighter option, and "something's changed" → re-plan.
+  - The streak is never mentioned. Neither is the adherence bar.
+  - For non-physiological gaps, lead with retention: the loss is smaller than they believe, their own numbers prove it, and today is the only hard part.
 
 ### Scenario G: The equipment surprise (gym closed, home only today)
 
@@ -900,7 +951,7 @@ See §6 lifecycle: contradiction with confidence > 0.8, time decay after 90 days
 Tiered fallback chain inside `LLMClient`:
 1. Try **Groq** (or **Gemini** for heavy tools) first.
 2. On 429/5xx → try **Cerebras** with the same prompt.
-3. On all-cloud failure → emit `LLMSuggestionRejected` with `reason: 'safety_block'` and fire the tool's deterministic fallback (see §3 tool specs).
+3. On all-cloud failure → emit `LLMCallObserved` with `outcome: 'fallback_used'` and fire the tool's deterministic fallback (see §3 tool specs).
 The app never blocks the user on a network call. UI shows a spinner for max 6 seconds, then degraded path runs.
 
 **5. What's the cold-start session?** (Day 1, no history, no embeddings — what does the LLM see?)
@@ -917,12 +968,6 @@ Per-user steady-state: ~3–6 LLM calls/day. With Gemini context caching of the 
 
 **8. How do you migrate the event schema in v2?** (Old events still need to replay.)
 Every event has `schemaVersion`. Upcasters live in `src/events/migrations/{type}/v1_to_v2.ts` as pure functions `(oldPayload) => newPayload`. On replay, the projection engine pipes each event through the upcaster chain before reducing. Replay test: load 6 months of v1 events, verify all projections rebuild without error.
-
-**6. What's the cost model?** (Cloud LLM calls/day per user × cents per call. Does it pencil?)
-
-**7. What's the privacy story?** (Where does data live? What goes to cloud LLM? Data export/delete?)
-
-**8. How do you migrate the event schema in v2?** (Old events still need to replay.)
 
 ---
 
@@ -946,7 +991,7 @@ Every event has `schemaVersion`. Upcasters live in `src/events/migrations/{type}
 |---|---|---|
 | No internet, cloud LLM needed | Deterministic fallback for the active tool | "Coach is offline — using your plan as-is. Tap to add a note." |
 | LLM returns invalid JSON | Retry × 3 with error feedback, then fallback | Spinner ≤6s, then degraded path |
-| LLM returns valid JSON but violates invariant | Reject, log `LLMSuggestionRejected`, retry × 1, then fallback | Same as above |
+| LLM returns valid JSON but violates invariant | Reject, log `LLMCallObserved { outcome: 'rejected_validator' }`, retry × 1, then fallback | Same as above |
 | LLM rate-limited (429) | Try next provider in tier chain (Groq → Cerebras → Gemini → fallback) | Transparent unless all fail |
 | SQLite write fails | Transaction rolls back; event NOT appended | Error toast: "Couldn't save. Retry?" |
 | Event hash chain breaks | App enters read-only debug mode; flag for support | Banner: "Detected data integrity issue — recovery mode." |
