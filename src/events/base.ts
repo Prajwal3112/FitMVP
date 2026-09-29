@@ -23,11 +23,72 @@ export type BaseEvent = z.infer<typeof BaseEventSchema>;
 export const GENESIS_PREV_HASH = '__genesis__';
 
 // ─── Hashing ─────────────────────────────────────────────────────────
-// Deterministic event hash: sha256(id + canonical JSON of payload).
-// Used to chain events. Verifies append-only history wasn't tampered with.
 
-export function hashEvent(input: { id: string; payload: unknown }): string {
-  return sha256(input.id + JSON.stringify(input.payload));
+/**
+ * JSON with object keys in sorted order, recursively.
+ *
+ * `JSON.stringify` preserves insertion order, so two payloads with identical
+ * content but different key order hash differently. Today they round-trip
+ * because the stored text is re-parsed in its own order — but that is an
+ * accident of the storage path, not a property of the hash, and an upcaster
+ * that rebuilds a payload would break it. Sorting makes the hash a function of
+ * the content alone.
+ */
+function canonicalJson(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'null';
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  const entries = Object.entries(value as Record<string, unknown>)
+    .filter(([, v]) => v !== undefined)
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`).join(',')}}`;
+}
+
+/** Everything the chain commits to. Nothing about an event sits outside it. */
+export type HashableEvent = {
+  id: string;
+  type: string;
+  occurredAt: string;
+  trainingDay: string;
+  schemaVersion: number;
+  /** The previous event's hash. Including it is what makes the chain a chain. */
+  prevHash: string;
+  payload: unknown;
+};
+
+/**
+ * The link in the hash chain.
+ *
+ * ⚠ THIS SIGNATURE CHANGED 2026-09-29, AND SO DID EVERY HASH. It used to be
+ * `sha256(id + JSON.stringify(payload))`, which had two holes:
+ *
+ *  1. `seq`, `type`, `occurredAt`, `trainingDay` and `schemaVersion` were all
+ *     OUTSIDE the hash. `trainingDay` is the most load-bearing field in the
+ *     system — it drives adherence, gap detection, the weekday signal, the
+ *     rotation and `sessionIdByDay` — and rewriting it in the database passed
+ *     `verifyChain()` clean. So did changing an event's `type`.
+ *  2. Event N's hash excluded N's own `prevHash`, so the "chain" did not
+ *     actually chain: forging event 5 required patching exactly ONE field on
+ *     event 6, not recomputing 6..N. Tampering was O(1) to hide, not O(N).
+ *
+ * Verified by execution both before (both attacks passed) and after (both
+ * caught) — see checks/schema.ts.
+ *
+ * Because every hash changes, ANY pre-existing database fails verifyChain and
+ * lands in read-only mode. That is acceptable exactly once, and this is the
+ * moment: the app has never run on a device, so no real log exists anywhere.
+ * Doing it after a tester has four weeks of data would mean an upcaster for
+ * the chain itself.
+ */
+export function hashEvent(input: HashableEvent): string {
+  return sha256([
+    input.prevHash,
+    input.id,
+    input.type,
+    input.occurredAt,
+    input.trainingDay,
+    String(input.schemaVersion),
+    canonicalJson(input.payload),
+  ].join('\u0000'));
 }
 
 // ─── Training-day boundary ───────────────────────────────────────────

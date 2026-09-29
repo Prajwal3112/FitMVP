@@ -1,6 +1,7 @@
-import { asc, desc, eq, gte, lte, and, type SQL } from 'drizzle-orm';
+import { asc, desc, eq, gte, lte, and, inArray, type SQL } from 'drizzle-orm';
 import { db } from '../db/client';
 import { events, type EventRow } from '../db/schema';
+import { upcastPayload } from './upcast';
 import {
   EventSchema,
   hashEvent,
@@ -18,6 +19,17 @@ import {
 
 let writeChain: Promise<unknown> = Promise.resolve();
 
+// ARCHITECTURE §12 — once the chain is known broken, the log is read-only.
+// Appending onto a corrupt chain buries the break under valid-looking rows.
+let readOnly: { brokenAtSeq: number; reason: string } | null = null;
+
+export function enterReadOnlyMode(at: { brokenAtSeq: number; reason: string }): void {
+  readOnly = at;
+}
+export function isReadOnly(): boolean {
+  return readOnly !== null;
+}
+
 async function withWriteLock<T>(fn: () => Promise<T>): Promise<T> {
   const previous = writeChain;
   let release!: () => void;
@@ -34,16 +46,46 @@ async function withWriteLock<T>(fn: () => Promise<T>): Promise<T> {
 
 // ─── Row ↔ Event conversion ──────────────────────────────────────────
 
+/**
+ * Rows this build could not parse. Surfaced to the UI so the failure is
+ * loud: the alternative, which shipped, was a `catch` that logged to a
+ * console nobody reads and left every projection at INITIAL_* — so
+ * `isOnboarded` was false, the navigator sent the user to Onboarding, and
+ * they saw a BRAND NEW APP with their whole history intact on disk and
+ * invisible. Then they re-onboarded and appended a second identity on top.
+ *
+ * The failure did not present as an error. It presented as "the app forgot
+ * me", which is the worst outcome this codebase can produce.
+ */
+let unreadableRows: { seq: number; type: string; reason: string }[] = [];
+
+export function unreadableEventCount(): number {
+  return unreadableRows.length;
+}
+export function unreadableEventDetail(): { seq: number; type: string; reason: string }[] {
+  return [...unreadableRows];
+}
+
 function rowToEvent(row: EventRow): Event {
+  const stored = JSON.parse(row.payloadJson) as unknown;
+
+  // Migrate the payload forward before validating. The schemas pin
+  // `schemaVersion: z.literal(N)`, so an un-upcast v1 row fails to parse the
+  // moment N becomes 2 — see src/events/upcast.ts for what that did.
+  const up = upcastPayload(row.type, row.schemaVersion, stored);
+  if (!up.ok) {
+    throw new Error(`seq ${row.seq}: ${up.reason}`);
+  }
+
   const reconstituted = {
     id: row.id,
     seq: row.seq,
     type: row.type,
     occurredAt: row.occurredAt,
     trainingDay: row.trainingDay,
-    schemaVersion: row.schemaVersion,
+    schemaVersion: up.version,
     prevHash: row.prevHash,
-    payload: JSON.parse(row.payloadJson) as unknown,
+    payload: up.payload,
   };
   return EventSchema.parse(reconstituted);
 }
@@ -82,6 +124,11 @@ export async function appendEvent(
   draft: AnyEventDraft,
   options: AppendOptions = {},
 ): Promise<AppendResult> {
+  if (readOnly !== null) {
+    throw new Error(
+      `Event log is read-only: integrity check failed at seq ${readOnly.brokenAtSeq} (${readOnly.reason}).`,
+    );
+  }
   const rolloverHour = options.rolloverHour ?? 4;
   const now = options.occurredAt ?? new Date();
   const occurredAt = now.toISOString();
@@ -98,8 +145,19 @@ export async function appendEvent(
       const last = lastRow[0] ?? null;
 
       const nextSeq = last ? last.seq + 1 : 0;
+      // Hashes the whole stored envelope, not just id + payload — see
+      // hashEvent. The row's own fields are used verbatim so the value here
+      // matches what verifyChain will recompute from disk.
       const prevHash = last
-        ? hashEvent({ id: last.id, payload: JSON.parse(last.payloadJson) })
+        ? hashEvent({
+            id: last.id,
+            type: last.type,
+            occurredAt: last.occurredAt,
+            trainingDay: last.trainingDay,
+            schemaVersion: last.schemaVersion,
+            prevHash: last.prevHash,
+            payload: JSON.parse(last.payloadJson),
+          })
         : GENESIS_PREV_HASH;
 
       const event: Event = EventSchema.parse({
@@ -146,16 +204,18 @@ export async function readEvents(filter: ReadFilter = {}): Promise<Event[]> {
   const conditions: SQL[] = [];
   if (filter.type) {
     const types = Array.isArray(filter.type) ? filter.type : [filter.type];
-    // Use OR via raw `in` would be nicer; for now, single-type fast path covers the common case.
+    // Push the type filter into SQL so it composes with the seq/day filters
+    // below. An earlier version short-circuited on multi-type reads and
+    // silently dropped fromSeq/toSeq/trainingDay.
     if (types.length === 1) {
       const t = types[0];
       if (t !== undefined) conditions.push(eq(events.type, t));
     } else if (types.length > 1) {
-      // Fallback: read all then filter in JS. (Single-user volume tolerates this.)
-      const rows = await db.select().from(events).orderBy(asc(events.seq));
-      return rows
-        .filter((r) => types.includes(r.type as EventType))
-        .map(rowToEvent);
+      conditions.push(inArray(events.type, types));
+    } else {
+      // Explicit empty type list means "match nothing" — don't silently
+      // widen it to "match everything".
+      return [];
     }
   }
   if (filter.fromSeq !== undefined) conditions.push(gte(events.seq, filter.fromSeq));
@@ -168,7 +228,35 @@ export async function readEvents(filter: ReadFilter = {}): Promise<Event[]> {
     ? await db.select().from(events).where(whereClause).orderBy(asc(events.seq))
     : await db.select().from(events).orderBy(asc(events.seq));
 
-  return rows.map(rowToEvent);
+  // Skip-and-count rather than throw. One unparseable row used to take the
+  // entire read down — and every future schemaVersion bump makes every
+  // historical row of that type unparseable, because each event schema pins
+  // `schemaVersion: z.literal(N)` and there is no upcaster chain yet.
+  const out: Event[] = [];
+  const bad: { seq: number; type: string; reason: string }[] = [];
+  for (const row of rows) {
+    try {
+      out.push(rowToEvent(row));
+    } catch (e) {
+      bad.push({
+        seq: row.seq,
+        type: row.type,
+        reason: e instanceof Error ? e.message.slice(0, 200) : String(e),
+      });
+    }
+  }
+  unreadableRows = bad;
+  if (bad.length > 0) {
+    // eslint-disable-next-line no-console
+    console.error(`[log] ${bad.length} unreadable row(s); first at seq ${bad[0]!.seq} (${bad[0]!.type}): ${bad[0]!.reason}`);
+    // Do not write on top of a log we cannot fully read — appending would
+    // bury the damage under valid-looking rows.
+    enterReadOnlyMode({
+      brokenAtSeq: bad[0]!.seq,
+      reason: `${bad.length} event(s) could not be read. First: ${bad[0]!.type} — ${bad[0]!.reason}`,
+    });
+  }
+  return out;
 }
 
 /** Convenience: last event in the log, or null if empty. */
@@ -228,7 +316,15 @@ export async function verifyChain(): Promise<ChainVerifyResult> {
         details: e instanceof Error ? e.message : String(e),
       };
     }
-    expectedPrevHash = hashEvent({ id: row.id, payload });
+    expectedPrevHash = hashEvent({
+      id: row.id,
+      type: row.type,
+      occurredAt: row.occurredAt,
+      trainingDay: row.trainingDay,
+      schemaVersion: row.schemaVersion,
+      prevHash: row.prevHash,
+      payload,
+    });
     expectedSeq += 1;
   }
 
