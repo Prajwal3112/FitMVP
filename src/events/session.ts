@@ -67,6 +67,20 @@ export type GenerationMode = z.infer<typeof GenerationModeEnum>;
 
 export const SESSION_SCHEDULED_VERSION = 1;
 
+/** A prep or cool-down movement, as prescribed. */
+export const MobilitySchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+});
+export type Mobility = z.infer<typeof MobilitySchema>;
+
+/** Something the engine wanted to prescribe and could not. */
+export const DroppedSlotSchema = z.object({
+  name: z.string().min(1),
+  reason: z.enum(['injury', 'soreness', 'nothing_available']),
+});
+export type DroppedSlot = z.infer<typeof DroppedSlotSchema>;
+
 export const SessionScheduledPayloadSchema = z.object({
   sessionId: z.string().min(1),
   trainingDay: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -76,6 +90,31 @@ export const SessionScheduledPayloadSchema = z.object({
   exercises: z.array(ExerciseSlotSchema).min(1),
   openingNote: z.string().max(400),
   generationMode: GenerationModeEnum,
+
+  // ── All four ADDITIVE-OPTIONAL, so no schemaVersion bump. ──
+  // The scheduler computed every one of these on every check-in and
+  // `checkInAndSchedule` forwarded none of them, so they were built and
+  // discarded ~25 times per workout and no user ever saw one. 137 warm-up
+  // movements and the whole dynamic-before/static-after argument produced
+  // zero pixels.
+
+  /** Raise temperature, then mobilise what today will load. Dynamic only. */
+  warmup: z.object({
+    raise: z.array(MobilitySchema),
+    mobilise: z.array(MobilitySchema),
+    minutes: z.number().int().nonnegative(),
+  }).optional(),
+  /** Held stretches, after — never before; static pre-lift cuts force output. */
+  cooldown: z.array(MobilitySchema).optional(),
+  /** What was left out, and why. Silence here reads as a thin session. */
+  dropped: z.array(DroppedSlotSchema).optional(),
+  /**
+   * Why today looks like this, in the user's words. `openingNote` only ever
+   * carried resolveSession's lines; the split rationale, the injury
+   * explanation, the pull-up-bar suggestion and the six-day-novice warning
+   * all lived past `reasons[0]` and Home rendered `reasons[0]` alone.
+   */
+  reasons: z.array(z.string().max(300)).max(8).optional(),
 });
 
 export type SessionScheduledPayload = z.infer<typeof SessionScheduledPayloadSchema>;

@@ -6,6 +6,8 @@ import type {
   SkipReason,
   SubstitutionReason,
   SessionReview,
+  Mobility,
+  DroppedSlot,
 } from '../events/session';
 
 // ─── Session status ──────────────────────────────────────────────────
@@ -57,6 +59,14 @@ export type SessionState = {
   highlights: string[];
   /** The user's own verdict on the session. Required to finish, while testing. */
   review: SessionReview | null;
+  /** Prep movements, dynamic only. Empty for sessions scheduled before 2026-09-29. */
+  warmup: { raise: Mobility[]; mobilise: Mobility[]; minutes: number } | null;
+  /** Held stretches, for after. */
+  cooldown: Mobility[];
+  /** Slots the engine could not fill, and why. */
+  dropped: DroppedSlot[];
+  /** Why today looks like this. `openingNote` is the one-line version. */
+  reasons: string[];
 };
 
 // ─── Projection state ────────────────────────────────────────────────
@@ -125,6 +135,10 @@ export function applySessionEvent(
         summary: null,
         highlights: [],
         review: null,
+        warmup: p.warmup ?? null,
+        cooldown: p.cooldown ?? [],
+        dropped: p.dropped ?? [],
+        reasons: p.reasons ?? [],
       };
       return {
         byId: { ...state.byId, [p.sessionId]: session },
@@ -162,6 +176,10 @@ export function applySessionEvent(
           summary: null,
           highlights: [],
           review: null,
+          warmup: null,
+          cooldown: [],
+          dropped: [],
+          reasons: [],
         };
         return {
           ...state,
@@ -276,6 +294,10 @@ export function applySessionEvent(
           summary: null,
           highlights: [],
           review: null,
+          warmup: null,
+          cooldown: [],
+          dropped: [],
+          reasons: [],
         };
         return {
           byId: { ...state.byId, [p.sessionId]: stub },

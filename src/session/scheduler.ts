@@ -6,7 +6,7 @@ import {
   type Exercise, type MovementPattern,
 } from '../data/exercises';
 import { musclesFor, type Muscle } from '../data/muscles';
-import { buildWarmup, buildCooldown, type Warmup } from '../data/warmups';
+import { buildWarmup, buildCooldown, type Warmup, type WarmupPlan } from '../data/warmups';
 import { selectSplit } from '../program/splits';
 import { getParameters, exerciseCount, type Parameters } from '../program/parameters';
 import { resolveSession, DAY_NAME, DAY_MUSCLES, type DayType } from '../program/resolve';
@@ -70,7 +70,7 @@ export type ScheduledSessionDraft = {
   exercises: ExerciseSlot[];
   openingNote: string;
   dropped: { name: string; reason: 'injury' | 'soreness' | 'nothing_available' }[];
-  warmup: { raise: Warmup[]; mobilise: Warmup[] };
+  warmup: WarmupPlan;
   cooldown: Warmup[];
   /** For the UI: why today looks like this. */
   splitName: string;

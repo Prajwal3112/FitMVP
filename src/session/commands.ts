@@ -184,6 +184,18 @@ export async function checkInAndSchedule(
       exercises,
       openingNote: draft.openingNote,
       generationMode: 'template_fallback',
+      // Persist what the scheduler worked out. Until now this call forwarded
+      // five fields and dropped four, so the warm-up, the cool-down, the
+      // dropped slots and every reason past the first were computed on every
+      // check-in and thrown away at the write boundary.
+      warmup: {
+        raise: draft.warmup.raise.map((w) => ({ id: w.id, name: w.name })),
+        mobilise: draft.warmup.mobilise.map((w) => ({ id: w.id, name: w.name })),
+        minutes: draft.warmup.minutes,
+      },
+      cooldown: draft.cooldown.map((w) => ({ id: w.id, name: w.name })),
+      dropped: draft.dropped,
+      reasons: draft.reasons.filter((r) => r.trim().length > 0).slice(0, 8),
     }),
     {
       rolloverHour: ctx.rolloverHour,

@@ -24,7 +24,7 @@ Steps 7a + 7c code-complete. Revalidated and hardened 2026-09-26 — five
 blockers found and fixed.**
 
 ⚠ **The app has never been run on a phone by anyone.** Every claim below is
-typechecker-and-`checks/`-deep. `npm run check` → 26 suites, `tsc` exit 0,
+typechecker-and-`checks/`-deep. `npm run check` → 27 suites, `tsc` exit 0,
 36 files uncommitted.
 
 | Step | Status | What landed |
@@ -212,7 +212,7 @@ and `src/session/plausibility.ts`.
   claims it is "for migration runner + advanced ops" while `useMigrations`
   takes `db`.
 - [x] **`checks/` is in the repo, behind `npm run check`** (`tsc --noEmit &&
-  ./checks/run.sh`). **26 suites**, and until 2026-09-29 zero new
+  ./checks/run.sh`). **27 suites**, and until 2026-09-29 zero new
   dependencies — `tsx` was already transitive. These were throwaway scratchpad scripts twice and were lost
   twice. New suites this pass: `onboarding`, `exercise_stability`,
   `progression_advances`, `reentry_rhythm`, `logging_guards`, `backup`,
@@ -222,18 +222,9 @@ and `src/session/plausibility.ts`.
 
 Ranked by what a tester actually hits.
 
-1. **Warm-up and cool-down are computed and thrown away.** `buildWarmup` /
-   `buildCooldown` run on every check-in; `SessionScheduledPayloadSchema` has no
-   field for them and `commands.ts` forwards only
-   `workoutId`/`workoutName`/`exercises`/`openingNote`. 137 movements, the whole
-   dynamic-before / static-after argument, **zero pixels.** The founder asked
-   for this on 2026-09-21. Additive-optional payload fields, no version bump.
-2. **`reasons[1..]`, `dropped` and `split.warning` are never displayed.** Home
-   renders `reasons[0]`, which is always `split.why`. Discarded: the
-   six-day-novice warning, the injury explanation ("324 exercises left out, and
-   nothing today loads it"), the pull-up-bar suggestion, the two-day
-   hypertrophy warning, and every "N exercises left out" line. **These are the
-   most human sentences in the codebase and the cheapest win available.**
+1. ~~Warm-up and cool-down computed and thrown away~~ — **RENDERED 2026-09-29.**
+2. ~~`reasons[1..]`, `dropped` and `split.warning` never displayed~~ —
+   **RENDERED 2026-09-29.** See "The prescription reaches the screen" below.
 3. **No exercise instructions on screen.** `exerciseInstructions.json` is
    **607 KB bundled and unreachable** (`getInstructions` has zero consumers).
    A beginner is handed "Thigh Abductor" with no affordance but Google.
@@ -242,9 +233,11 @@ Ranked by what a tester actually hits.
 5. **No mid-session swap** (2.5). The rack is taken and there is no path —
    `findSubstitutesTiered` exists, is tested, has zero consumers. Skip is one
    irreversible tap that disappears after the first set.
-6. **`targetRpe` and `params.restSec` are computed and never rendered.** The
-   timer is hardcoded to 150 s for everyone; a fat-loss user whose whole
-   programme is density gets 2:30 rests.
+6. **`targetRpe` and `params.restSec` are computed and never rendered** — the
+   last two NO-PIXEL items (`checks/reachability.ts` tracks the set). The timer
+   is hardcoded to 150 s for everyone; a fat-loss user whose whole programme is
+   density gets 2:30 rests, and a "rough day" check-in lowers `maxRpe` to 7
+   without telling anyone.
 7. ~~**The unlock gate punishes the ideal client.**~~ **FIXED 2026-09-29** —
    see "The unlock gate + the card" below. (Original finding kept for the
    reasoning:) `recovery` (weight 12) needs
@@ -272,6 +265,41 @@ Ranked by what a tester actually hits.
 13. `getTodaysWorkout` in `src/constants/workouts.ts` is dead and still
     contains a `throw` inside render. `Equipment` and `motivationalMessages`
     are its only live exports; move them and delete the rest.
+
+## The prescription reaches the screen (2026-09-29)
+
+`buildSessionDraft` returned `warmup`, `cooldown`, `dropped` and `reasons` on
+every check-in. `checkInAndSchedule` forwarded five fields and dropped those
+four, and `SessionScheduledPayloadSchema` had nowhere to put them — so 137
+warm-up movements, every dropped-slot explanation and every reason past the
+first were computed ~25 times per workout and discarded **at the write
+boundary**. No user had ever seen one. This is the class of bug a
+consumer-grep cannot see, which is why `checks/reachability.ts` runs a pixel
+test: `buildWarmup` always had a consumer; it had no pixel.
+
+**Four additive-optional payload fields**, so no schemaVersion bump and every
+pre-2026-09-29 event still parses: `warmup`, `cooldown`, `dropped`, `reasons`.
+`commands.ts` forwards them, the projection carries them.
+
+**Home** now renders every reason under "WHY TODAY LOOKS LIKE THIS" and a
+"LEFT OUT TODAY" section. The estimate includes the warm-up minutes. A novice
+who picks six days finally reads the thing the engine has been writing all
+along: *"You said six days. Starting there almost never lasts — three sessions
+you actually do beat six you abandon."*
+
+**Workout** gets a PREP block at the top (dynamic only, with the reason stated
+so nobody stretches first) and COOL DOWN at the bottom once there is something
+to cool down from, each tickable. **Ticks are local state on purpose** — a
+within-session convenience is not worth an event type, and putting UI state in
+the log makes it un-replayable.
+
+`DROP_REASON` lives in `src/constants/copy.ts`, not in both screens. I wrote it
+twice first, with a comment claiming it was in one place — the exact failure
+this codebase keeps producing. `Record<DroppedSlot['reason'], string>` makes
+the compiler demand copy for any new reason.
+
+Pixel test: **6 of 6 NO PIXEL → 2** (`targetRpe`, `restSec` remain).
+`checks/prescription_survives.ts` asserts the whole path.
 
 ## Mandatory end-of-session review (2026-09-29)
 
@@ -685,7 +713,7 @@ Something close to:
 > A six-reviewer revalidation on 2026-09-26 found five blockers, all fixed and
 > verified (see that section) — the app is now passable end to end in logic,
 > but **it has still never been run on a phone by anyone.**
-> `npm run check` → 26 suites. Nothing is committed.
+> `npm run check` → 27 suites. Nothing is committed.
 > Two decisions are waiting on you: (1) `expo-file-system` + `expo-sharing` for
 > a restorable backup, which gates turning off the Google auto-backup of the
 > event log; (2) whether the four-week AI unlock ships to testers at all — two
@@ -701,7 +729,7 @@ Then wait.
 ```bash
 cd FitMVP
 npm install
-npm run check       # tsc --noEmit && ./checks/run.sh — expect: 26 passed, 0 failed
+npm run check       # tsc --noEmit && ./checks/run.sh — expect: 27 passed, 0 failed
 ```
 
 `npm run check` is the gate. It needs no test runner — `tsx` arrives as a

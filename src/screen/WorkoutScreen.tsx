@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../constants/colors';
+import { DROP_REASON } from '../constants/copy';
 import { typography } from '../constants/typography';
 import { ExerciseLogCard, type LogSetArgs } from '../components/ExerciseLogCard';
 import { RestTimerBar, useRestTimer } from '../components/RestTimer';
@@ -105,6 +106,12 @@ export default function WorkoutScreen({
   // `active` until then, so a tester who quits here can resume from Home
   // rather than losing the workout. `completeSession` refuses without a review
   // (see its InvariantViolation), so this cannot be routed around.
+  // Local, not persisted — see the PREP comment below.
+  const [prepDone, setPrepDone] = useState<string[]>([]);
+  const [coolDone, setCoolDone] = useState<string[]>([]);
+  const warmup = session.warmup;
+  const cooldown = session.cooldown;
+
   const handleDone = () => {
     if (busy) return;
     navigation.navigate('Review', { sessionId: session.sessionId });
@@ -174,6 +181,45 @@ export default function WorkoutScreen({
           </>
         )}
 
+        {/* PREP. Built on every check-in since 2026-09-25 and rendered
+            nowhere: 137 movements, the whole dynamic-before/static-after
+            argument, zero pixels. Ticks are local state on purpose — they are
+            a within-session convenience, not a fact worth an event type, and
+            pretending otherwise would put un-replayable UI state in the log. */}
+        {warmup !== null && (warmup.raise.length > 0 || warmup.mobilise.length > 0) && (
+          <>
+            <Text style={styles.section}>
+              PREP {warmup.minutes > 0 ? `· ~${warmup.minutes} MIN` : ''}
+            </Text>
+            <View style={styles.group}>
+              <View style={styles.prepNote}>
+                <Text style={styles.prepNoteText}>
+                  Movement, not stretching. Held stretches before lifting
+                  temporarily cut how much force you can produce — those are at
+                  the end.
+                </Text>
+              </View>
+              {[...warmup.raise, ...warmup.mobilise].map((m, i) => {
+                const on = prepDone.includes(m.id);
+                return (
+                  <TouchableOpacity
+                    key={m.id}
+                    style={[styles.mobRow, i > 0 && styles.mobDivider]}
+                    onPress={() => setPrepDone((prev) =>
+                      prev.includes(m.id) ? prev.filter((x) => x !== m.id) : [...prev, m.id])}
+                    activeOpacity={0.6}
+                  >
+                    <View style={[styles.tick, on && styles.tickOn]}>
+                      <Text style={[styles.tickMark, on && styles.tickMarkOn]}>✓</Text>
+                    </View>
+                    <Text style={[styles.mobName, on && styles.mobNameDone]}>{m.name}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </>
+        )}
+
         <Text style={styles.section}>EXERCISES</Text>
         <View style={styles.group}>
           {exercises.map((slot, i) => (
@@ -191,6 +237,57 @@ export default function WorkoutScreen({
             />
           ))}
         </View>
+
+        {/* COOL DOWN. Held stretches, and only here — buildCooldown returns
+            one per muscle actually worked, so it is not four hamstring
+            stretches. Shown once there is something to cool down from. */}
+        {cooldown.length > 0 && canFinish && (
+          <>
+            <Text style={styles.section}>COOL DOWN</Text>
+            <View style={styles.group}>
+              <View style={styles.coolNote}>
+                <Text style={styles.prepNoteText}>
+                  Hold each one 20–30 seconds. Now is when stretching helps.
+                </Text>
+              </View>
+              {cooldown.map((m, i) => {
+                const on = coolDone.includes(m.id);
+                return (
+                  <TouchableOpacity
+                    key={m.id}
+                    style={[styles.mobRow, i > 0 && styles.mobDivider]}
+                    onPress={() => setCoolDone((prev) =>
+                      prev.includes(m.id) ? prev.filter((x) => x !== m.id) : [...prev, m.id])}
+                    activeOpacity={0.6}
+                  >
+                    <View style={[styles.tick, on && styles.tickOn]}>
+                      <Text style={[styles.tickMark, on && styles.tickMarkOn]}>✓</Text>
+                    </View>
+                    <Text style={[styles.mobName, on && styles.mobNameDone]}>{m.name}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </>
+        )}
+
+        {/* What the engine wanted to prescribe and could not. Silence here
+            reads as a thin session the app never explained. */}
+        {session.dropped.length > 0 && (
+          <>
+            <Text style={styles.section}>LEFT OUT</Text>
+            <View style={styles.group}>
+              {session.dropped.map((d, i) => (
+                <View key={i} style={[styles.mobRow, i > 0 && styles.mobDivider]}>
+                  <View style={{ flex: 1, paddingVertical: 10 }}>
+                    <Text style={styles.mobName}>{d.name}</Text>
+                    <Text style={styles.prepNoteText}>{DROP_REASON[d.reason]}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </>
+        )}
 
         {!confirmSkip ? (
           <>
@@ -252,6 +349,23 @@ const SKIP_LABELS: Record<SkipReason, string> = {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
+  prepNote: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 12 },
+  prepNoteText: { fontSize: 13, lineHeight: 19, color: colors.textMuted },
+  mobRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 16, minHeight: 56,
+  },
+  mobDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.separator },
+  tick: {
+    width: 26, height: 26, borderRadius: 13, borderWidth: 1.5,
+    borderColor: colors.separator, alignItems: 'center', justifyContent: 'center',
+  },
+  tickOn: { backgroundColor: colors.primary, borderColor: colors.primary },
+  tickMark: { fontSize: 14, color: 'transparent' },
+  tickMarkOn: { color: '#FFFFFF' },
+  mobName: { flex: 1, fontSize: 16, color: colors.text },
+  mobNameDone: { color: colors.textTertiary, textDecorationLine: 'line-through' },
+  coolNote: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 12 },
   waitText: { fontSize: 15, color: colors.textMuted, marginTop: 16 },
   waitBtn: { marginTop: 24, minHeight: 44, justifyContent: 'center' },
   waitLink: { fontSize: 15, color: colors.primary },

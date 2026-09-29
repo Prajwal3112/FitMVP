@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../constants/colors';
+import { DROP_REASON } from '../constants/copy';
 import { typography } from '../constants/typography';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { ProgressBar } from '../components/ProgressBar';
@@ -43,7 +44,15 @@ export default function HomeScreen({
   // Only the preview carries the engine's reasoning; a scheduled session
   // keeps its opening note instead.
   const splitName = todaysSession ? null : (preview?.splitName ?? null);
-  const why = todaysSession ? null : (preview?.reasons[0] ?? null);
+  // ALL of them, not reasons[0]. reasons[0] is always split.why, so the
+  // injury explanation ("324 exercises left out, and nothing today loads
+  // it"), the pull-up-bar suggestion, the two-day hypertrophy warning and the
+  // six-day-novice warning were computed every check-in and never shown.
+  const reasons = todaysSession ? todaysSession.reasons : (preview?.reasons ?? []);
+  const dropped = todaysSession ? todaysSession.dropped : (preview?.dropped ?? []);
+  const warmupMinutes = todaysSession
+    ? todaysSession.warmup?.minutes ?? 0
+    : preview?.warmup.minutes ?? 0;
 
   const status = todaysSession?.status ?? null;
   const isDone = status === 'completed';
@@ -223,10 +232,9 @@ export default function HomeScreen({
                 <>
                   <Text style={styles.cellTitle}>{workoutName}</Text>
                   <Text style={styles.cellSubPlain}>
-                    Day {currentDay} · ~{estimatedMinutes} min · {exerciseCount} exercises
+                    Day {currentDay} · ~{estimatedMinutes + warmupMinutes} min · {exerciseCount} exercises
                     {splitName !== null ? ` · ${splitName}` : ''}
                   </Text>
-                  {why !== null && <Text style={styles.cellSub}>{why}</Text>}
                 </>
               ) : (
                 <>
@@ -241,6 +249,36 @@ export default function HomeScreen({
             </View>
           </View>
         </View>
+
+        {reasons.length > 0 && (
+          <>
+            <Text style={styles.section}>WHY TODAY LOOKS LIKE THIS</Text>
+            <View style={styles.group}>
+              {reasons.map((r, i) => (
+                <View
+                  key={i}
+                  style={[styles.reasonRow, i > 0 && styles.reasonDivider]}
+                >
+                  <Text style={styles.reasonText}>{r}</Text>
+                </View>
+              ))}
+            </View>
+          </>
+        )}
+
+        {dropped.length > 0 && (
+          <>
+            <Text style={styles.section}>LEFT OUT TODAY</Text>
+            <View style={styles.group}>
+              {dropped.map((d, i) => (
+                <View key={i} style={[styles.reasonRow, i > 0 && styles.reasonDivider]}>
+                  <Text style={styles.droppedName}>{d.name}</Text>
+                  <Text style={styles.droppedWhy}>{DROP_REASON[d.reason]}</Text>
+                </View>
+              ))}
+            </View>
+          </>
+        )}
 
         {isDone && !!todaysSession?.summary && (
           <>
@@ -320,6 +358,11 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginLeft: 4,
   },
+  reasonRow: { paddingHorizontal: 16, paddingVertical: 13 },
+  reasonDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.separator },
+  reasonText: { fontSize: 15, lineHeight: 21, color: colors.text },
+  droppedName: { fontSize: 15, fontWeight: '500', color: colors.text },
+  droppedWhy: { fontSize: 13, lineHeight: 18, color: colors.textMuted, marginTop: 3 },
   contextWrap: { marginTop: 28 },
   section: {
     ...typography.sectionHeader,

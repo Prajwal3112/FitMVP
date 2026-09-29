@@ -167,8 +167,10 @@ for (const [label, re] of pixel) {
   if (!rendered) noPixel.push(label);
   console.log(`  ${rendered ? 'rendered  ' : 'NO PIXEL  '} ${label}`);
 }
-ck('the NO PIXEL set has not grown beyond what CLAUDE.md records',
-  noPixel.length <= 6, noPixel.join(', '));
+// Was 6 of 6 with no pixel. warmup / cooldown / dropped / reasons[1..] are
+// now rendered; targetRpe and restSec remain (CLAUDE.md "Still open" item 6).
+ck('warmup, cooldown, dropped and the full reasons list all reach a screen',
+  noPixel.length <= 2, noPixel.join(', '));
 console.log('\n  (NO PIXEL entries are computed every check-in and discarded —');
 console.log('   tracked as items 1, 2 and 6 in CLAUDE.md "Still open".)');
 
