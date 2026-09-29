@@ -1,6 +1,6 @@
 import 'react-native-gesture-handler';
 import React, { useEffect } from 'react';
-import { View, Text, ActivityIndicator, TouchableOpacity, Share } from 'react-native';
+import { View, Text, ActivityIndicator, TouchableOpacity, Share, Alert } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -121,6 +121,48 @@ export default function App(): React.ReactElement {
         >
           <Text style={{ color: '#FFFFFF', fontSize: 17, fontWeight: '600' }}>Send the report</Text>
         </TouchableOpacity>
+
+        {/*
+          DEV ONLY escape hatch. This screen is deliberately terminal for a
+          tester — writing onto a broken chain buries the break under
+          valid-looking rows, and a "reset" button is how someone destroys the
+          only copy of their history in a moment of frustration.
+          But in development it is reachable for a boring reason: changing the
+          hash algorithm (2026-09-29) invalidates every existing dev database,
+          so the founder's own phone lands here on first launch with no way
+          forward. __DEV__ gates it out of every build a tester installs.
+        */}
+        {__DEV__ && (
+          <TouchableOpacity
+            onPress={() => {
+              Alert.alert(
+                'Wipe the log?',
+                'DEV ONLY. Deletes every event on this device permanently. Use this when the hash algorithm changed under an old database.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Wipe',
+                    style: 'destructive',
+                    onPress: () => {
+                      void (async () => {
+                        const { wipeAllEvents } = await import('./src/dev/seed');
+                        await wipeAllEvents();
+                        setIntegrity(null);
+                      })();
+                    },
+                  },
+                ],
+              );
+            }}
+            activeOpacity={0.7}
+            style={{ marginTop: 12, minHeight: 52, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Text style={{ color: colors.destructive, fontSize: 15, fontWeight: '600' }}>
+              Wipe and start fresh (dev only)
+            </Text>
+          </TouchableOpacity>
+        )}
+
         <Text style={{ fontSize: 13, color: colors.textMuted, lineHeight: 19, marginTop: 24 }}>
           Technical detail: {integrity.reason}
         </Text>
