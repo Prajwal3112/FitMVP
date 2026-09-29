@@ -4,7 +4,15 @@ import { BaseEventSchema, type EventDraft } from './base';
 // ─── Shared sub-schemas ─────────────────────────────────────────────
 
 export const ProfileSchema = z.object({
-  age: z.number().int().min(0).max(150),
+  /**
+   * OPTIONAL, and nothing reads it. Onboarding never asked for age, yet the
+   * payload builder required it — `Number('') === 0` failed the `> 0` check
+   * and every new user hit "Invalid age" under a form with no age field.
+   * Widened rather than back-filled with a fabricated number: if we do not
+   * know someone's age we should not record one. Widening keeps every
+   * existing payload valid, so no schemaVersion bump.
+   */
+  age: z.number().int().min(0).max(150).optional(),
   height_cm: z.number().positive().max(300),
   weight_kg: z.number().positive().max(500),
   sex: z.enum(['m', 'f', 'other']),
@@ -28,6 +36,33 @@ export const ConstraintsSchema = z.object({
   sessionMaxMinutes: z.number().int().positive().max(240),
 });
 
+// ─── Experience ──────────────────────────────────────────────────────
+// The single highest-value onboarding answer. Drives starting-load
+// estimates, whether RPE is shown at all, and whether exercises are
+// capped to beginner-safe movements.
+
+export const ExperienceEnum = z.enum(['new', 'returning', 'regular', 'experienced']);
+export type Experience = z.infer<typeof ExperienceEnum>;
+
+/**
+ * What the user actually owns, beyond the home/gym tier. Values match the
+ * exercise library's equipment labels so they filter directly.
+ */
+export const OwnedEquipmentEnum = z.enum([
+  'body only',
+  'dumbbell',
+  'bands',
+  'kettlebells',
+  'exercise ball',
+  'medicine ball',
+  'barbell',
+  'machine',
+  'cable',
+  'e-z curl bar',
+  'pullup bar',
+]);
+export type OwnedEquipment = z.infer<typeof OwnedEquipmentEnum>;
+
 export type Constraints = z.infer<typeof ConstraintsSchema>;
 
 // ─── UserContextCreated (v1) ─────────────────────────────────────────
@@ -41,6 +76,10 @@ export const UserContextCreatedPayloadSchema = z.object({
   constraints: ConstraintsSchema,
   knownInjuries: z.array(z.string()),                 // lowercase muscle/joint tags
   dayRolloverHour: z.number().int().min(0).max(23),   // default 4
+  // Additive + optional: every payload written before these existed still
+  // validates, so no schemaVersion bump and no upcaster (see §15 rule).
+  experience: ExperienceEnum.optional(),
+  ownedEquipment: z.array(OwnedEquipmentEnum).optional(),
 });
 
 export type UserContextCreatedPayload = z.infer<typeof UserContextCreatedPayloadSchema>;
