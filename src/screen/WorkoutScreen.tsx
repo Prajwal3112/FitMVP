@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, KeyboardAvoidingView, Platform, TouchableOpacity, Alert, ActivityIndicator,
+  View, Text, ScrollView, StyleSheet, KeyboardAvoidingView, Platform, TouchableOpacity, Alert, ActivityIndicator, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../constants/colors';
@@ -107,6 +107,7 @@ export default function WorkoutScreen({
   // rather than losing the workout. `completeSession` refuses without a review
   // (see its InvariantViolation), so this cannot be routed around.
   // Local, not persisted — see the PREP comment below.
+  const [skipNote, setSkipNote] = useState('');
   const [prepDone, setPrepDone] = useState<string[]>([]);
   const [coolDone, setCoolDone] = useState<string[]>([]);
   const warmup = session.warmup;
@@ -122,7 +123,7 @@ export default function WorkoutScreen({
     setBusy(true);
     void (async () => {
       try {
-        await skipToday(reason);
+        await skipToday(reason, skipNote.trim().length > 0 ? skipNote.trim() : undefined);
         setConfirmSkip(false);
         navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
       } catch (e) {
@@ -314,6 +315,21 @@ export default function WorkoutScreen({
             <Text style={styles.confirmSub}>
               Why? This is what your coach learns from.
             </Text>
+            {/* SessionSkippedPayloadSchema has carried an optional `notes`
+                field since Step 7a and nothing ever wrote to it. For a product
+                whose whole thesis is the lapse, "why didn't you train" is the
+                most valuable sentence available — and it belongs in the log,
+                where the tester report can aggregate it, not in a chat thread. */}
+            <TextInput
+              style={styles.skipNote}
+              value={skipNote}
+              onChangeText={setSkipNote}
+              placeholder="In your own words (optional)"
+              placeholderTextColor={colors.textTertiary}
+              maxLength={500}
+              multiline
+              textAlignVertical="top"
+            />
             {(['time', 'unmotivated', 'illness', 'travel', 'other'] as const).map((r) => (
               <PrimaryButton
                 key={r}
@@ -349,6 +365,11 @@ const SKIP_LABELS: Record<SkipReason, string> = {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
+  skipNote: {
+    backgroundColor: colors.background, borderRadius: 10, borderWidth: 1,
+    borderColor: colors.separator, padding: 12, minHeight: 64, marginTop: 12,
+    fontSize: 15, lineHeight: 21, color: colors.text,
+  },
   prepNote: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 12 },
   prepNoteText: { fontSize: 13, lineHeight: 19, color: colors.textMuted },
   mobRow: {

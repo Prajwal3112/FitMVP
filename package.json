@@ -7,7 +7,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "check": "tsc --noEmit && ./checks/run.sh"
+    "check": "tsc --noEmit && ./checks/run.sh",
+    "review-report": "tsx tools/review-report.ts"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",

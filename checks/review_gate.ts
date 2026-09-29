@@ -80,5 +80,32 @@ console.log('\n  --- what lands in your chat thread ---');
 digest.split('\n').filter((l) => /VERDICT|GRIPES|verdict|shoulder|▸/.test(l))
   .forEach((l) => console.log(`  ${l}`));
 
+console.log('\nSkip notes — "why didn\'t you train", the sentence this product needs most\n');
+// SessionSkippedPayloadSchema has carried an optional `notes` field since
+// Step 7a and nothing wrote to it. For a product whose thesis is the lapse,
+// that was the most valuable field in the schema sitting unused.
+let sq = 0; let sp = GENESIS_PREV_HASH;
+const sevs: Event[] = [];
+const spush = (type: string, payload: Record<string, unknown>) => {
+  const e = { id: `sk${sq}`, seq: sq, type, occurredAt: '2026-01-07T09:00:00.000Z',
+    trainingDay: '2026-01-07', schemaVersion: 1, prevHash: sp, payload } as unknown as Event;
+  sevs.push(e); sp = hashEvent(e); sq += 1;
+};
+spush('SessionScheduled', { sessionId: 'k1', trainingDay: '2026-01-07', planId: null,
+  workoutId: 'w', workoutName: 'Lower body', openingNote: '', generationMode: 'template_fallback',
+  exercises: [{ exerciseId: 'squat', name: 'Barbell Squat', sets: 3, targetReps: 8 }] });
+spush('SessionSkipped', { sessionId: 'k1', trainingDay: '2026-01-07', reason: 'unmotivated',
+  notes: 'work ran late and I could not face it' });
+
+const sproj = buildSessionsProjection(sevs);
+const k1 = sproj.byId['k1'];
+ck('the skip reason lands on the session', k1?.skipReason === 'unmotivated');
+ck('the skip NOTE lands on the session', k1?.skipNotes === 'work ran late and I could not face it',
+  String(k1?.skipNotes));
+const skipDigest = buildDigest(sproj, selectContextCompleteness(sproj, '2026-01-08'),
+  INITIAL_USER_CONTEXT, 'test');
+ck('the digest reports the skip note', skipDigest.includes('could not face it'));
+console.log(`       "${k1?.skipNotes ?? '(none)'}"`);
+
 console.log(fails === 0 ? '\nall passed' : `\n${fails} FAILURE(S)`);
 if (fails > 0) process.exit(1);

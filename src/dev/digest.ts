@@ -73,6 +73,7 @@ export function buildDigest(
       L.push(`    energy ${s.checkin.energy}${sore ? ` · sore: ${sore}` : ''}`);
     }
     if (s.skipReason) L.push(`    reason: ${s.skipReason}`);
+    if (s.skipNotes) L.push(`      "${s.skipNotes}"`);
     // THE REASON THIS FILE EXISTS. Everything else here is derived; this is
     // the tester's own judgement of whether the session was any good, which
     // is the one thing the engine cannot work out for itself.

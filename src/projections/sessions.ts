@@ -55,6 +55,8 @@ export type SessionState = {
   startedAt: string | null;
   completedAt: string | null;
   skipReason: SkipReason | null;
+  /** The tester's own words on why they didn't train. */
+  skipNotes: string | null;
   summary: string | null;
   highlights: string[];
   /** The user's own verdict on the session. Required to finish, while testing. */
@@ -132,6 +134,7 @@ export function applySessionEvent(
         startedAt: null,
         completedAt: null,
         skipReason: null,
+        skipNotes: null,
         summary: null,
         highlights: [],
         review: null,
@@ -173,6 +176,7 @@ export function applySessionEvent(
           startedAt: null,
           completedAt: null,
           skipReason: null,
+          skipNotes: null,
           summary: null,
           highlights: [],
           review: null,
@@ -291,6 +295,7 @@ export function applySessionEvent(
           startedAt: null,
           completedAt: null,
           skipReason: p.reason,
+          skipNotes: p.notes ?? null,
           summary: null,
           highlights: [],
           review: null,
@@ -312,6 +317,7 @@ export function applySessionEvent(
         ...s,
         status: 'skipped',
         skipReason: p.reason,
+        skipNotes: p.notes ?? null,
       }));
     }
 

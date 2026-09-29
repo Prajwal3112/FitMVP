@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../constants/colors';
+import { TellMe } from '../components/TellMe';
 import { typography } from '../constants/typography';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { ChipSelector, type ChipOption } from '../components/ChipSelector';
@@ -86,6 +87,7 @@ export default function GoalScreen({
             loading={submitting}
             style={styles.cta}
           />
+          <TellMe where="Goal" label="Stuck here? Tell me" />
           {submitError !== null && (
             <Text style={styles.errorText}>{submitError}</Text>
           )}

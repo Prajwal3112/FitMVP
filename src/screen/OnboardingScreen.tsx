@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../constants/colors';
+import { TellMe } from '../components/TellMe';
 import { INJURY_AREAS, areaLabel } from '../data/muscles';
 import { typography } from '../constants/typography';
 import { PrimaryButton } from '../components/PrimaryButton';
@@ -249,6 +250,13 @@ export default function OnboardingScreen({
           {!isValid && !submitting && (
             <Text style={styles.needs}>{invalidReason}</Text>
           )}
+          {/* The only screen every tester must pass, and until now the only
+              one with no way to report being stuck on it. */}
+          <TellMe
+            where="Onboarding"
+            label="Stuck here? Tell me"
+            detail={() => `form: ${JSON.stringify(form)}\nblocked by: ${invalidReason ?? 'nothing'}`}
+          />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

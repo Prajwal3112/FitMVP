@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../constants/colors';
+import { TellMe } from '../components/TellMe';
 import { typography } from '../constants/typography';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { useFitness } from '../context/FitnessContext';
@@ -156,6 +157,7 @@ export default function ReviewScreen({
           {verdict === null && (
             <Text style={styles.footnote}>Pick one of the three above to finish.</Text>
           )}
+          <TellMe where="Review" label="Something else you want to tell me?" />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

@@ -266,6 +266,40 @@ Ranked by what a tester actually hits.
     contains a `throw` inside render. `Equipment` and `motivationalMessages`
     are its only live exports; move them and delete the rest.
 
+## The feedback loop, closed (2026-09-29)
+
+Three holes found by tracing what a tester can actually reach.
+
+**1. Every feedback path was on Home or a crash screen.** So a tester who
+stalled during onboarding or the goal flow — which is exactly where people
+stall — had no way to tell anyone. The most valuable report in a first test is
+"I couldn't get past the second screen", and it was the one report the app made
+impossible. `src/components/TellMe.tsx` is now on Onboarding, Goal and Review;
+it stamps WHERE they were and the build, because "it didn't work" without a
+location is unactionable.
+
+**2. `SessionSkippedPayloadSchema` has carried an optional `notes` field since
+Step 7a and nothing ever wrote to it.** `skipToday(reason, notes?)` accepted it;
+the UI passed only the reason. For a product whose whole thesis is the lapse,
+"why didn't you train" is the most valuable sentence available — and it belongs
+in the log where it aggregates, not in a chat thread. Now an optional field on
+the skip sheet, carried through the projection, the digest and the report.
+
+**3. The digest does not aggregate.** Prose is right for one person reading one
+thread and useless for six people over four weeks. The BACKUP file is the full
+event log as JSON, so that is the channel that aggregates:
+
+    npm run review-report ~/Downloads/fitmvp-backups
+
+`tools/review-report.ts` validates every file through `parseBackup` first (a
+truncated transfer is reported, never averaged in — it caught a malformed
+fixture on its first real run) and prints: who is still training and who has
+gone quiet, the verdict split with what a skew in each direction means,
+gripes ranked, **prescribed vs logged per tester** (where in a session people
+stop), **exercises prescribed but never logged** — a silent "no" — skip
+reasons with their free text, and every written note grouped by tester with
+their setup. Testers who wrote nothing are named, because silence is data too.
+
 ## The prescription reaches the screen (2026-09-29)
 
 `buildSessionDraft` returned `warmup`, `cooldown`, `dropped` and `reasons` on
