@@ -690,6 +690,126 @@ file they can restore from.
 - [x] 6.2 EAS build config → `eas.json` preview profile, APK, internal
   distribution. Not yet run.
 
+## Phase 7 — Onboarding rebuild + device-test findings (2026-10-02)
+
+From the founder's first real device session. **Every factual claim in it was
+verified against the code and every one was correct**; two were worse than
+observable from outside. This is what one hour on a phone bought that 28
+automated checks could not.
+
+### 7.0 — Decisions taken from the measurements
+
+- **The AI context gate moves 4 weeks → 3 weeks.** Measured on 3×/week data:
+  wk1 26% · **wk2 68%** · **wk3 73%** · wk4 75%. Seven of eight facets complete
+  by week 3; week 4 buys **two percentage points**. And in a ~4-week friend
+  test a 4-week gate means nobody reaches the payoff. New gate:
+  `weeksIn >= 3 && percent >= 65`. The only facet still short at week 3 is
+  `energy`, which wants a VARIETY of days, not more time.
+- **Cycle support is opt-in, not inferred from gender.** Asking gender and
+  deriving periods from it is wrong on two counts: it excludes trans,
+  non-binary, post-menopausal and contraceptive-amenorrhoeic users, and it
+  guesses at something the user can simply be asked. And since "those days are
+  never the same", a calendar predictor would be a fiction. Instead: an
+  optional "cramping / low day" input on the check-in that scales volume the
+  way soreness already does. Flexible by construction, no prediction, no
+  cycle-tracking data held. Gender is still asked (optionally) because it
+  changes starting-load ratios.
+- **Experience splits into two axes.** They correlate but are not the same:
+  *training history* drives load estimates, *movement familiarity* drives
+  whether the app explains a lift. Someone returning after two years knows a
+  squat and needs lighter loads; someone who has read everything and lifted
+  nothing is the reverse.
+
+### 7.1 — Onboarding, rebuilt (7 of the 21 findings)
+- [ ] **Phase it.** One question per screen, not 9 sections on one scroll.
+      Progress indicator, back between steps, `KeyboardAvoidingView` per step —
+      the keyboard currently covers the field being typed into.
+- [ ] **Re-order by priority.** Current order is an accident of when questions
+      were added. Proposed: where you train → what you own → training history →
+      movement familiarity → realistic days + which days + what time →
+      bodyweight (+ optional gender) → anything to work around.
+- [ ] **Generic, human wording.** "How long have you been training" with
+      options like "new to this / coming back after a break" reads as jargon to
+      someone who has never trained.
+- [ ] **Injuries, not "anything that hurts".** First contact should acknowledge
+      the client's situation, not ask what is wrong with them.
+- [ ] **Two experience axes** (see 7.0). `startingLoad` consumes the history
+      axis; the explain-this-movement affordance consumes the familiarity axis.
+- [ ] **Training schedule, not just a count.** Which days and roughly what
+      time. Unblocks 7.5 and gives notifications something to aim at later.
+- [ ] **Every answer must earn its place in the 3-week context.** An onboarding
+      question that does not change a session or feed a facet should be cut.
+
+### 7.2 — Goal, with examples
+- [ ] Suggest 3-4 worked examples so a client learns what a usable goal looks
+      like. The `why` free text is currently quoted back on two screens and
+      reaches no engine; a good one should be worth something by week 3.
+
+### 7.3 — Copy: stop the negative framing
+- [ ] **"You said six days. Starting there almost never lasts — three sessions
+      you actually do beat six you abandon."** Mine, and the founder is right:
+      it is the first thing a motivated person reads after committing, and it
+      reads as the app predicting failure. Same fact, inverted: *"Three days to
+      start. We'll add the fourth once three is a habit."* Audit every
+      `split.warning` and `reason` string for the same tone.
+
+### 7.4 — The gym-hands pass (5 findings)
+- [ ] **Steppers, not keyboards**, for weight and reps. Sweaty hands, one hand
+      free. The keyboard also covers the row being edited.
+- [ ] **Remove a set**, and remove a warm-up set. Add-only today, and
+      `warmupCount` is local state so added warm-up rows vanish on reload.
+- [ ] **Lock the session.** `Workout` has `options={{ title: '' }}` — no back
+      guard, no `BackHandler`. Back silently exits a live session. Must ask:
+      abandon, or skip the day? (The *review* screen was locked; the session
+      was not.)
+- [ ] **Resume must show where you were.** It restores logged sets but says
+      nothing about how much is done or what is next.
+- [ ] **Label the scales.** Energy 1-10 has no explanation — and only `<=3` vs
+      `>3` changes anything, so **7 of the 10 dots do nothing**. Either make
+      'good' mean something or ship three buttons (Phase 3.4 already says so).
+      Soreness levels have a hint, but it sits below the chips and the feedback
+      is three tiny dots; users tap repeatedly and read it as a bug.
+
+### 7.5 — When is my next session?
+- [ ] Nothing in the app says when to train next. Needs 7.1's schedule answer,
+      then Home can say "Next: Thursday" and a rest day can read as a rest day
+      rather than an unstarted workout.
+
+### 7.6 — Mid-session swap, slot-constrained
+- [ ] "The machine is taken" is the commonest real-gym event and there is no
+      path. `findSubstitutesTiered` exists, is tested, has **zero consumers**.
+      The swap must offer only exercises valid for that slot's movement
+      pattern, which is exactly what the tiered search does.
+
+### 7.7 — Movement explanations, lightweight
+- [ ] The founder asked for video; the measurement argues against it. Only
+      **39 of 743 exercises are ever prescribed** and ~33 are canonical
+      (Barbell Squat, Bench Press, Romanian Deadlift, Chin-Up). Text for all
+      39 is **34 KB**; for the ~6 genuinely obscure ones, **under 5 KB**. Video
+      means megabytes or a network call, and this app has no network by design.
+      **Cheapest fix first: rename the six obscure ones** (Thigh Abductor, Air
+      Bike, Cable Crunch, Glute Kickback) to recognisable names — 0 KB.
+
+### 7.8 — The tester report is incomplete (blocks segmenting pain by client)
+- [ ] **`PreCheckinRecorded.notes` is collected and never reported.** "Slept
+      badly, shoulder feels off, short on time" — prime free text, invisible.
+- [ ] **The goal and the `why` never reach the report**, so pain cannot be
+      segmented by goal.
+- [ ] The report prints only experience / daysPerWeek / where. Add bodyweight,
+      injuries, session length, goal, schedule and (once asked) gender, so a
+      complaint can be attributed to a *type* of client.
+- [ ] **Validation gate:** feed the report a synthetic cohort and confirm every
+      free-text channel and every profile field appears. Three channels exist
+      (review note, skip note, check-in note) and only two are wired.
+
+### 7.9 — Re-validate after each change
+- [ ] After every item above: `npm run check`, then re-run the persona sweep
+      and confirm prescriptions still differ per client and nothing empties.
+      **The founder's instruction: keep checking whether each change actually
+      improves things, rather than assuming it does.** Two changes in this
+      session made things worse before measurement caught them (flooring
+      `loadStep`, and the first `reachability` pixel test).
+
 **Engineering debt — interleave, don't batch.**
 - [~] D.1 **The per-tap replay is fixed; the cold fold is still quadratic.**
   `recordSet` now folds the single returned event forward via `applyOneEvent`
