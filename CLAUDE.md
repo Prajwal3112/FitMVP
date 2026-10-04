@@ -690,6 +690,165 @@ file they can restore from.
 - [x] 6.2 EAS build config → `eas.json` preview profile, APK, internal
   distribution. Not yet run.
 
+## ⚠ STRATEGIC REVIEW — three independent reviews, 2026-10-04
+
+**Status: the product thesis is UNRESOLVED and no further feature work is
+justified until it is.** Recorded as findings, not decisions — the founder has
+not chosen yet.
+
+Three reviews reached the same verdict independently: this Claude session, a
+subagent given only measured facts and told to treat the project's own docs as
+claims, and ChatGPT given a neutral brief with no reasoning attached. All three:
+**radically narrow, or stop. Do not continue as specified.**
+
+### What they agreed on, with the measurements behind it
+- **The 743-exercise engine produces two alternating workouts**, 12 distinct
+  exercises, indefinitely. 39 of 743 are reachable at all. No periodisation, no
+  deload, no variation. ⚠ *I measured this on 2026-09-29 and reported it as a
+  SUCCESS* ("6 per day type, correct for Upper/Lower"). It is correct
+  programming and a two-workout app; I gave the engineering fact and never
+  asked the product question.
+- **The app cannot log a workout.** `logSet` throws `Set 4 exceeds the 3
+  prescribed`. No add-exercise, no swap, no remove-set. Not four bugs — one
+  assumption: the app is in charge and you comply. Every real session violates
+  it within ten minutes.
+- **The differentiator structurally cannot fire.** The lapse screen needs the
+  lapsed person to open the app; `expo-notifications` is not a dependency and
+  there are no network calls. It only ever reaches someone who already came
+  back unaided.
+- **The AI unlock is pointed the wrong way.** ARCHITECTURE says the LLM "never
+  picks structure — only flavour", so three weeks unlocks *better sentences*.
+  Les Mills 2026 (>10,000 consumers): **10% prefer an AI-created workout**,
+  under-27s least of all. Future killed its AI-PT beta in June 2026.
+- **"Anyone into any kind of fitness" means the customer is unknown.**
+- **The founder lost confidence after one hour of his own use.** The strongest
+  possible advocate, maximum tolerance for rough edges, full knowledge of
+  intent — unconvinced. That is the signal, not a data point to work around.
+
+### THE REFRAME — ChatGPT's contribution, and the best idea in any review
+Do not build *"an app that doesn't punish you for lapsing."*
+Build **"a training system designed around imperfect adherence."**
+
+> *"The important question isn't 'how do I congratulate someone after they
+> return?' It's 'how should training intelligently change when someone's real
+> life repeatedly interferes with the plan?'"*
+
+**Why this is materially better, and not just nicer words:** it moves the value
+from a *message* to the *programming*, and in doing so it **dissolves the fatal
+notification problem.** "Don't punish the lapse" requires reaching an absent
+person — impossible here. "Designed around imperfect adherence" is delivered
+entirely *while they are using the app*: irregular frequency, variable time,
+variable energy, equipment that isn't there, resuming after a gap, progression
+after interruption. None of that needs a push notification.
+
+### The bones already exist — and the best of them is unwired
+This is a re-prioritisation of what is already built, plus deleting most of the
+rest. Not a rewrite:
+- `resolveSession` — **the rotation advances on completion, never the
+  calendar.** Miss Wednesday and Thursday is still Wednesday's session. That IS
+  imperfect-adherence design, and it is the decision this project got most
+  right.
+- `reentryPolicy` — graded bands, reason-aware, six modes.
+- `selectScheduleAdvice` — *"You've missed Friday 4 of the last 4. Shall we
+  make this a 2-day week? Same muscles, one less thing to feel bad about."*
+  **The reframe in one function. ZERO consumers.**
+- `selectAdherenceWindow` — trailing 4 weeks, not a streak.
+- soreness and energy as volume modifiers; `sessionMaxMinutes` for time.
+- `suggestLoad` + its reason lines — the one thing a notebook cannot do, and
+  what JuggernautAI / RP charge **$35/month** for. ~260 lines of ~10,000.
+
+### A caution on the convergence
+Three reviews agreeing is weaker evidence than it looks. They were genuinely
+independent — different models, no shared prompt, none saw another — so
+agreement on the *measured facts* is real. But all three reason from facts I
+supplied, and their market judgements draw on the same public training data
+about fitness apps. **What none of them has is a single real user who is not
+the founder.** See [[primed-agent-convergence-risk]].
+
+### EVIDENCE, 2026-10-04 — researched, not reasoned
+A fourth review went and looked for evidence instead of arguing. It changes
+the conclusion from "narrow it" to **"freeze and test the hypothesis with
+500 lines"**.
+
+**The thesis is already shipped by a major competitor.** Fitbod's own docs:
+*"After a training break, Fitbod automatically lowers weight recommendations
+to ease you back in."* Plus a "Took a Break?" recalibration flow that re-reads
+your actual performance. That is not a welcome-back message — it is this
+project's differentiator, in market. Gentler Streak owns the emotional half,
+with user reviews reading almost verbatim like our own copy: *"it's been
+forgiving, and it has never made me feel like I can't keep up or that hiatuses
+have ended my fitness path."*
+
+**The most damaging finding is a study, not a competitor.** 115M logged
+activities, >1M users, 31 months: **>75% of lapsed users re-engage after 30+
+days** (58% after 90). But returning users behave like NEW users, and
+re-engagement correlates with **a goal resurfacing** — not with how the app
+handled the previous lapse. So the causal arrow is *life event → return*, not
+*good re-entry → return*. The app cannot manufacture the first.
+
+**No evidence anyone switches or pays for re-entry handling.** The single
+switching example found was caused by a paywall, not by training re-entry.
+Across MyFitnessPal (~2.8M reviews), Whoop (5.3k), Peloton (6.7k) and Fitbod
+Trustpilot corpora, re-entry is **not a top-five grievance** — it is long-tail.
+
+**And the competitors' users praise the opposite of our design.** Hevy and
+Strong reviews specifically value *logging what actually happened* — custom
+exercises, failed sets, drop sets, editable routines. Our `logSet` rejects a
+set that was not prescribed. That is a direct product-market signal against
+the core design assumption.
+
+### THE REFRAME THAT SURVIVES
+Do not try to cause the return — there is no notification channel and the
+evidence says UX does not cause it anyway. **75% come back on their own.**
+The defensible job is therefore: **do not waste the return.** When someone
+reappears unaided, does the app put them on a path they can sustain, or does
+it hand them their old numbers and let them bounce? That is entirely in-app,
+needs no push notification, and is measurable.
+
+### The architecture verdict — my own reasoning was self-serving
+I argued the LLM must never pick the prescription because rules are testable
+and this app puts load on spines. The counter, which is correct: that argument
+*assumes the rule engine can express the needed intelligence*, and **my own
+measurements say it cannot** — 39 reachable exercises, two alternating
+workouts. "Therefore all prescription intelligence stays hand-coded" protects
+the engine I built rather than solving the problem.
+
+The right shape is a hybrid, and research backs it: a 2026 systematic review
+of 24 studies found LLM-written plans inferior to human plans in 5 of 6
+head-to-head comparisons, with safety problems in 14 of 24. So:
+
+    user's words -> LLM -> STRUCTURED STATE -> deterministic engine
+                                            -> safety validator -> session
+
+The LLM interprets semantics (*"slept 5 hours, shoulder is off, 35 minutes,
+bench is taken"*) into a state the rules can act on. It never emits a load.
+
+### What the reviews say to do next
+Not "give it to six friends." All three rejected that, for the same reason:
+the findings six testers would return are ones one week of real use surfaces
+for free, and the data cannot come back (the digest needs a tap; the person who
+quit will not tap, and there is no channel to ask).
+
+**FREEZE this repo. Build ~500 lines. Test interruption cycles with real
+people.** Do not delete anything; do not add anything either — no exercises,
+no LLM, no notifications, no event types, no architecture, no test suites.
+
+The 500-line experiment: logger + RPE autoregulation + gap-aware return, and
+the user may **swap, add a set, remove a set, change the load and finish
+early**. Then put real people through a deliberate interruption: train 3
+weeks, disappear 2, return — and measure whether they return, follow the
+prescription, modify it, finish, train again, and whether they would move
+their history off Hevy for it.
+
+> *"Infrastructure can make a validated product robust. It cannot make an
+> unvalidated product valuable."*
+
+The honest accounting: of ~10,000 lines, the part that answers "does anybody
+want this" is `suggestLoad` (~260 lines) plus `reentryPolicy`. Event sourcing,
+the hash chain, upcasters, the 743-exercise library and 28 suites are real
+engineering assets that answer a different question — *can I build this
+properly* — which was never the one in doubt.
+
 ## Phase 7 — Onboarding rebuild + device-test findings (2026-10-02)
 
 From the founder's first real device session. **Every factual claim in it was
