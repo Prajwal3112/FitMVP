@@ -20,7 +20,8 @@ import type { ImageSourcePropType } from 'react-native';
  *
  * Source: yuhonas/free-exercise-db, Unlicense (public domain).
  */
-export const EXERCISE_IMAGES: Record<string, ImageSourcePropType> = {
+/** Module-private: `exerciseImage()` is the only way in. */
+const EXERCISE_IMAGES: Record<string, ImageSourcePropType> = {
   'Air_Bike': require('./img/Air_Bike.jpg'),
   'Arnold_Dumbbell_Press': require('./img/Arnold_Dumbbell_Press.jpg'),
   'Barbell_Bench_Press_-_Medium_Grip': require('./img/Barbell_Bench_Press_-_Medium_Grip.jpg'),
@@ -119,5 +120,6 @@ export function exerciseImage(id: string): ImageSourcePropType | undefined {
 // REGENERATE: re-run the reachability sweep in checks/, download `<id>/0.jpg`
 // for each reachable id from free-exercise-db, resize with
 // `sips -Z 320 --setProperty formatOptions 55`, then rebuild this file from
-// the contents of ./img. If the scheduler's selection changes, the reachable
+// the contents of ./img — keeping EXERCISE_IMAGES module-private, since
+// `exerciseImage()` is the only consumer. If the scheduler's selection changes, the reachable
 // set changes with it — checks/images.ts fails when they drift apart.
