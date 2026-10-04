@@ -33,10 +33,17 @@ for (const [label, days, step] of [['UPPER_LOWER_4', 4, 2], ['FULL_BODY_3', 3, 1
     stable ? '' : `\n       ${[...new Set(seen)].length} distinct sets across 6 visits`);
 }
 
-// Total distinct ids over a 12-week block, same day type.
-const ids = new Set<string>();
-for (let r = 0; r < 24; r += 2) for (const e of draft(r, [], 4).exercises) ids.add(e.exerciseId);
-ck(`12 weeks of UPPER produces 6 distinct exercises, not 13+ (got ${ids.size})`, ids.size <= 7, `${ids.size}`);
+// WITHIN one block the occupant must not move — that is what progression
+// needs. ACROSS blocks it must, or the programme is two workouts forever.
+// BLOCK_SESSIONS is 24, so rotations 0..22 are all block 0.
+const inBlock = new Set<string>();
+for (let r = 0; r < 24; r += 2) for (const e of draft(r, [], 4).exercises) inBlock.add(e.exerciseId);
+ck(`one block of UPPER uses exactly 6 exercises (got ${inBlock.size})`, inBlock.size === 6, `${inBlock.size}`);
+
+const overAYear = new Set<string>();
+for (let r = 0; r < 144; r += 2) for (const e of draft(r, [], 4).exercises) overAYear.add(e.exerciseId);
+ck(`but across blocks the programme rotates (${overAYear.size} over 2 years)`,
+  overAYear.size > 6, `${overAYear.size}`);
 
 // Having history on an exercise must not push it out of its slot.
 const base = draft(0).exercises.map((e) => e.exerciseId);

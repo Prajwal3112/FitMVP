@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Image } from 'react-native';
 import { colors } from '../constants/colors';
+import { exerciseImage } from '../data/exerciseImages';
 import type { ExerciseSlot } from '../events/session';
 import type { LoggedSet, ExercisePerformance } from '../projections/sessions';
 import type { LoadSuggestion } from '../session/progression';
@@ -74,6 +75,11 @@ export const ExerciseLogCard: React.FC<ExerciseLogCardProps> = ({
   const [rpeOpenFor, setRpeOpenFor] = useState<string | null>(null);
   const [warmupCount, setWarmupCount] = useState<number>(0);
   const [extraSets, setExtraSets] = useState<number>(0);
+  const [showPhoto, setShowPhoto] = useState(false);
+  // Collapsed by default: someone who knows what a squat is should not scroll
+  // past a photo of one every session. It is here for the first time you meet
+  // "Thigh Abductor" or "Glute Kickback".
+  const photo = exerciseImage(slot.exerciseId);
 
   // Show whichever is greater: what was suggested, or what the user actually
   // logged. A set restored from the log must always have a row, otherwise it
@@ -275,7 +281,19 @@ export const ExerciseLogCard: React.FC<ExerciseLogCardProps> = ({
       <View style={styles.header}>
         <Text style={styles.index}>{index + 1}</Text>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.name, isSkipped && styles.strike]}>{slot.name}</Text>
+          <View style={styles.nameRow}>
+            <Text style={[styles.name, isSkipped && styles.strike]}>{slot.name}</Text>
+            {photo !== undefined && !isSkipped && (
+              <TouchableOpacity
+                onPress={() => setShowPhoto((v) => !v)}
+                activeOpacity={0.6}
+                hitSlop={8}
+                style={styles.photoToggle}
+              >
+                <Text style={styles.photoToggleText}>{showPhoto ? 'hide' : "what's this?"}</Text>
+              </TouchableOpacity>
+            )}
+          </View>
           {slot.swappedFrom !== undefined && (
             <Text style={styles.swapNote}>
               swapped from {exerciseName(slot.swappedFrom)}
@@ -285,6 +303,9 @@ export const ExerciseLogCard: React.FC<ExerciseLogCardProps> = ({
                   ? " — you're sore there"
                   : ''}
             </Text>
+          )}
+          {showPhoto && photo !== undefined && (
+            <Image source={photo} style={styles.photo} resizeMode="cover" />
           )}
           <Text style={styles.lastLine}>
             {lastLine}
@@ -444,6 +465,13 @@ const styles = StyleSheet.create({
   rpeChipOn: { backgroundColor: colors.text },
   rpeChipText: { fontSize: 13, fontWeight: '600', color: colors.textMuted },
   rpeChipTextOn: { color: colors.background },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  photoToggle: { minHeight: 32, justifyContent: 'center', paddingHorizontal: 2 },
+  photoToggleText: { fontSize: 12, color: colors.primary },
+  photo: {
+    width: '100%', aspectRatio: 3 / 2, borderRadius: 8,
+    marginTop: 8, marginBottom: 2, backgroundColor: colors.disabledFill,
+  },
   undoHint: { fontSize: 12, color: colors.textTertiary, paddingLeft: 42, paddingTop: 4 },
   addRow: { flexDirection: 'row', gap: 8, paddingLeft: 42, paddingVertical: 6 },
   addBtn: { minHeight: 40, paddingHorizontal: 12, justifyContent: 'center' },

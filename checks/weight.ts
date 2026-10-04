@@ -29,6 +29,8 @@ function walk(dir: string): string[] {
 const srcFiles = walk(join(ROOT, 'src'));
 
 console.log('\nBundled data — every KB ships to every tester\n');
+// Photos are budgeted separately in checks/images.ts, which also proves each
+// one is for an exercise the scheduler can actually prescribe.
 const json = srcFiles.filter((f) => f.endsWith('.json'));
 let total = 0;
 for (const f of json.sort()) {
@@ -40,6 +42,9 @@ console.log(`  ${String(total).padStart(5)} KB  total`);
 // 192 KB today. The exercise library is the product; anything much past this
 // wants justifying, because it is paid by every install on every phone.
 ck('bundled JSON stays under 260 KB', total < 260, `${total} KB`);
+const photos = srcFiles.filter((f) => f.endsWith('.jpg'));
+const photoKb = Math.round(photos.reduce((n, f) => n + statSync(f).size, 0) / 1024);
+console.log(`  ${String(photoKb).padStart(5)} KB  ${photos.length} demonstration photos (see checks/images.ts)`);
 ck('no single asset over 200 KB', json.every((f) => statSync(f).size < 200 * 1024),
   json.filter((f) => statSync(f).size >= 200 * 1024).map((f) => relative(ROOT, f)).join(', '));
 

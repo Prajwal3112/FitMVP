@@ -109,8 +109,47 @@ const NEEDS_FIXTURE = /pull-?ups?|chin-?ups?|muscle-?ups?|dips?|hanging|inverted
  * half the cards forever. Variety is the user's to ask for (task 2.5,
  * mid-session swap); it is not the scheduler's to impose.
  */
-function jitter(id: string): number {
-  let h = 7;
+/**
+ * How many completed sessions a training block lasts.
+ *
+ * The slot occupant is stable WITHIN a block and rotates BETWEEN blocks. That
+ * is how programming actually works: you do not change bench press every
+ * session, you change it every few weeks when the progression stalls.
+ *
+ * TWENTY-FOUR, chosen by measurement rather than taste. On a two-day split a
+ * block of N total completions gives each exercise only N/2 exposures, and
+ * `suggestLoad` needs two consecutive sessions at the same load before it will
+ * add weight — so a short block rotates the lift away before it can progress:
+ *
+ *     BLOCK_SESSIONS=12  ->  7 lifts frozen over 12 weeks, 32 distinct/year
+ *     BLOCK_SESSIONS=18  ->  12 frozen,                    29 distinct/year
+ *     BLOCK_SESSIONS=24  ->  0 frozen,                      23 distinct/year
+ *     BLOCK_SESSIONS=36  ->  0 frozen,                      18 distinct/year
+ *
+ * 24 is also a real training block — about 8 weeks at 3x/week — and gives 12
+ * exposures per exercise on a 2-day split. Shorter looks like more variety and
+ * silently costs progression, which is the whole point of the app.
+ */
+const BLOCK_SESSIONS = 24;
+
+/**
+ * How many of the best candidates a slot rotates between across blocks.
+ *
+ * Salting the jitter with the block index did not work: jitter returns 0..1
+ * and the score gaps between candidates are 10 or more (equipment preference,
+ * the compound bonus), so it only ever breaks exact ties. A year of training
+ * produced 13 distinct exercises instead of 12 — technically rotation,
+ * practically nothing.
+ *
+ * Rotating by RANK is explicit: take the Nth-best candidate for this block.
+ * Capped at 3 so the slot always gets one of the genuinely good options for
+ * that pattern rather than drifting into the obscure tail — the thing that
+ * handed everyone "Alternating Floor Press" before staples were declared.
+ */
+const ROTATE_AMONG = 3;
+
+function jitter(id: string, block: number): number {
+  let h = 7 + block * 7919;
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) % 9973;
   return h / 9973; // 0..1
 }
@@ -126,6 +165,8 @@ function pickForSlot(
   owned: string[],
   tier: EquipmentTier,
   novice: boolean,
+  /** Training block. Stable within, rotates between — see BLOCK_SESSIONS. */
+  block: number,
 ): Exercise | undefined {
   const needsFixture = (e: Exercise) =>
     tier === 'home' && NEEDS_FIXTURE.test(e.name) && !owned.includes('pullup bar');
@@ -148,6 +189,9 @@ function pickForSlot(
     // Inverted. Continuity is the point: an exercise you have numbers
     // against is worth more than a fresh one, because the numbers are what
     // progression reads.
+    // Continuity is worth a lot WITHIN a block — the numbers are what
+    // progression reads. It must not outweigh a deliberate block change,
+    // though, or the programme would never rotate at all.
     if (known.has(e.id)) score += 45;
 
     // Prefer the recognisable version of a movement. Without this the
@@ -168,10 +212,13 @@ function pickForSlot(
 
     if (SPECIALIST.test(e.name)) score -= novice ? 45 : 22;
 
-    return { e, score: score + jitter(e.id) };
+    return { e, score: score + jitter(e.id, block) };
   });
   scored.sort((a, b) => b.score - a.score);
-  return scored[0]?.e;
+  // Nth-best for this block, wrapping. Stable within a block because `block`
+  // is stable; different between blocks because it advances.
+  const pick = scored.length > 0 ? block % Math.min(scored.length, ROTATE_AMONG) : 0;
+  return scored[pick]?.e ?? scored[0]?.e;
 }
 
 /**
@@ -197,6 +244,10 @@ export function buildSessionDraft(input: ScheduleInput): ScheduledSessionDraft {
   const injuries = input.injuries ?? [];
   const owned = input.ownedEquipment ?? [];
   const known = new Set(input.knownExerciseIds ?? []);
+  // Which training block we are in. rotationIndex counts COMPLETED sessions,
+  // so this advances with real training rather than the calendar — the same
+  // rule the day type follows.
+  const block = Math.floor(rotationIndex / BLOCK_SESSIONS);
   const tier = equipment as EquipmentTier;
 
   // 1 ─ which split
@@ -252,6 +303,7 @@ export function buildSessionDraft(input: ScheduleInput): ScheduledSessionDraft {
     const ex = pickForSlot(
       slot, pool, used, i, goal, known, owned, tier,
       experience === 'new' || experience === 'returning',
+      block,
     );
     if (!ex) {
       dropped.push({ name: slot.replace(/_/g, ' '), reason: 'nothing_available' });
@@ -294,7 +346,7 @@ export function buildSessionDraft(input: ScheduleInput): ScheduledSessionDraft {
     for (let i = 0; i < fallback.length && exercises.length < Math.min(want, 4); i++) {
       const slot = fallback[i]!;
       const ex = pickForSlot(slot, pool, used, i, goal, known, owned, tier,
-        experience === 'new' || experience === 'returning');
+        experience === 'new' || experience === 'returning', block);
       if (!ex) continue;
       const worst = Math.max(0, ...ex.pm.map((m) => sore.get(m) ?? 0));
       if (worst >= 3) continue;
