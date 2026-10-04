@@ -353,6 +353,46 @@ export function draftExerciseSkipped(
 
 // ─── SessionCompleted (v1) ───────────────────────────────────────────
 
+// ─── SetRemoved (v1) ─────────────────────────────────────────────────
+//
+// A TOMBSTONE, not a deletion. The log is append-only, so "remove set 4"
+// is recorded as a fact that happened rather than by erasing the original
+// SetCompleted — which would break the hash chain and make history
+// unreplayable. The reducer filters the pair out on fold.
+//
+// Needed because the app suggests rather than enforces: if you can log a set
+// that was not prescribed, you must be able to take back one you logged by
+// mistake. Add-only was the other half of the same defect.
+
+export const SET_REMOVED_VERSION = 1;
+
+export const SetRemovedPayloadSchema = z.object({
+  sessionId: z.string().min(1),
+  exerciseId: z.string().min(1),
+  setIndex: z.number().int().nonnegative(),
+  isWarmup: z.boolean().optional(),
+});
+
+export type SetRemovedPayload = z.infer<typeof SetRemovedPayloadSchema>;
+
+export const SetRemovedSchema = BaseEventSchema.extend({
+  type: z.literal('SetRemoved'),
+  schemaVersion: z.literal(SET_REMOVED_VERSION),
+  payload: SetRemovedPayloadSchema,
+});
+
+export type SetRemoved = z.infer<typeof SetRemovedSchema>;
+
+export function draftSetRemoved(
+  payload: SetRemovedPayload,
+): EventDraft<'SetRemoved', SetRemovedPayload> {
+  return {
+    type: 'SetRemoved',
+    schemaVersion: SET_REMOVED_VERSION,
+    payload: SetRemovedPayloadSchema.parse(payload),
+  };
+}
+
 export const SESSION_COMPLETED_VERSION = 1;
 
 /**

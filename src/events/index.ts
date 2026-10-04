@@ -21,6 +21,7 @@ import {
   SessionStartedSchema,
   SessionResumedSchema,
   SetCompletedSchema,
+  SetRemovedSchema,
   ExerciseSubstitutedSchema,
   ExerciseSkippedSchema,
   SessionCompletedSchema,
@@ -41,6 +42,7 @@ import {
   type SessionStartedPayload,
   type SessionResumedPayload,
   type SetCompletedPayload,
+  type SetRemovedPayload,
   type ExerciseSubstitutedPayload,
   type ExerciseSkippedPayload,
   type SessionCompletedPayload,
@@ -63,6 +65,7 @@ export const EventSchema = z.discriminatedUnion('type', [
   SessionStartedSchema,
   SessionResumedSchema,
   SetCompletedSchema,
+  SetRemovedSchema,
   ExerciseSubstitutedSchema,
   ExerciseSkippedSchema,
   SessionCompletedSchema,
@@ -85,6 +88,7 @@ export type AnyEventDraft =
   | EventDraft<'SessionStarted', SessionStartedPayload>
   | EventDraft<'SessionResumed', SessionResumedPayload>
   | EventDraft<'SetCompleted', SetCompletedPayload>
+  | EventDraft<'SetRemoved', SetRemovedPayload>
   | EventDraft<'ExerciseSubstituted', ExerciseSubstitutedPayload>
   | EventDraft<'ExerciseSkipped', ExerciseSkippedPayload>
   | EventDraft<'SessionCompleted', SessionCompletedPayload>

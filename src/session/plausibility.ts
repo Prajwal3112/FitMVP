@@ -16,6 +16,14 @@
 
 /** Above any real human performance. The point is a slipped digit, not judgement. */
 export const MAX_PLAUSIBLE_WEIGHT_KG = 500;
+/**
+ * A sanity cap on sets per exercise — NOT a prescription limit.
+ *
+ * The prescribed count is a suggestion the user may exceed; see the comment in
+ * `logSet`. This exists only so a stuck finger or a loop cannot write
+ * thousands of rows into an append-only log.
+ */
+export const MAX_SETS_PER_EXERCISE = 30;
 export const MAX_PLAUSIBLE_REPS = 200;
 export const MAX_PLAUSIBLE_DURATION_SEC = 3600;
 

@@ -62,6 +62,7 @@ const KNOWN_ORPHANS = new Set([
   // layer lands.
   'rawSqlite',
   'SessionVerdictEnum', 'SessionGripeEnum', 'SessionReviewSchema',
+  'SetRemovedSchema', 'SetRemovedPayloadSchema', 'MAX_SETS_PER_EXERCISE',
 ]);
 
 function walk(dir: string): string[] {

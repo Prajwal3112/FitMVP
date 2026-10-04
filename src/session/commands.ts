@@ -6,6 +6,7 @@ import {
   draftPreCheckinRecorded,
   draftSessionStarted,
   draftSetCompleted,
+  draftSetRemoved,
   draftExerciseSkipped,
   draftSessionCompleted,
   draftSessionSkipped,
@@ -24,7 +25,7 @@ import {
   type SessionState,
 } from '../projections/sessions';
 import { buildSessionDraft } from './scheduler';
-import { implausibleSet } from './plausibility';
+import { implausibleSet, MAX_SETS_PER_EXERCISE } from './plausibility';
 import type { SessionReview } from '../events/session';
 import { scaleSets, type ReentryPolicy } from './reentry';
 import { buildExtractiveSummary, averageRpe, completedExerciseIds } from './summary';
@@ -281,13 +282,28 @@ export async function logSet(
   }
   // Warmups ramp toward the working sets, so they get their own index
   // space rather than consuming prescribed volume.
-  const limit = input.isWarmup ? MAX_WARMUP_SETS : slot.sets;
-  if (input.setIndex >= limit) {
+  // THE APP SUGGESTS. IT DOES NOT ENFORCE.
+  //
+  // This used to throw `Set 4 exceeds the 3 prescribed`. One line, and it made
+  // the whole app a prescriber rather than a logger: if it said 3 sets and you
+  // did 5, sets 4 and 5 did not exist. Every real session breaks the plan
+  // within ten minutes — the rack is taken, you felt strong, you ran out of
+  // time — and the app's answer was to refuse the evidence.
+  //
+  // It also destroyed the thing this project is actually about. Deviation IS
+  // the signal for training around imperfect adherence: a cut set says the day
+  // was hard, two extra say there was more in the tank. Rejecting it meant
+  // learning nothing from precisely the moments that matter.
+  //
+  // `slot.sets` is now a SUGGESTION. A cap remains, far above any real session,
+  // because a runaway loop or a stuck finger should not write 10,000 rows.
+  const cap = input.isWarmup ? MAX_WARMUP_SETS : MAX_SETS_PER_EXERCISE;
+  if (input.setIndex >= cap) {
     throw new InvariantViolation(
       'set_out_of_range',
       input.isWarmup
-        ? `That's more than ${MAX_WARMUP_SETS} warmup sets.`
-        : `Set ${input.setIndex + 1} exceeds the ${slot.sets} prescribed.`,
+        ? `That's more than ${MAX_WARMUP_SETS} warm-up sets.`
+        : `${cap} sets on one exercise is more than anyone does — check the number.`,
     );
   }
 
@@ -310,6 +326,47 @@ export async function logSet(
 }
 
 // ─── Skip one exercise ───────────────────────────────────────────────
+
+/**
+ * Take back a logged set.
+ *
+ * The other half of suggest-not-enforce: if the prescribed count is only a
+ * suggestion you may exceed, you must be able to undo one you logged by
+ * mistake. Add-only was the same defect wearing a different hat — and
+ * re-tapping the tick used to overwrite a real set with the prefill, which is
+ * what people reach for when they want an undo.
+ */
+export async function removeSet(
+  ctx: SessionContext,
+  input: { sessionId: string; exerciseId: string; setIndex: number; isWarmup?: boolean },
+): Promise<Event> {
+  const session = requireSession(ctx, input.sessionId);
+  if (session.status !== 'active') {
+    throw new InvariantViolation(
+      'bad_transition',
+      `Cannot change sets on a ${session.status} session.`,
+    );
+  }
+  const isWarmup = input.isWarmup === true;
+  const exists = session.setLog.some(
+    (x) => x.exerciseId === input.exerciseId &&
+      x.setIndex === input.setIndex &&
+      x.isWarmup === isWarmup,
+  );
+  if (!exists) {
+    throw new InvariantViolation('no_such_set', 'That set is not logged.');
+  }
+  const { event } = await appendEvent(
+    draftSetRemoved({
+      sessionId: input.sessionId,
+      exerciseId: input.exerciseId,
+      setIndex: input.setIndex,
+      ...(isWarmup ? { isWarmup: true } : {}),
+    }),
+    { rolloverHour: ctx.rolloverHour, ...(ctx.now ? { occurredAt: ctx.now } : {}) },
+  );
+  return event;
+}
 
 export async function skipExercise(
   ctx: SessionContext,

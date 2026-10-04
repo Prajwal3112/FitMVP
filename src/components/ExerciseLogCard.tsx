@@ -28,6 +28,8 @@ export type ExerciseLogCardProps = {
   last: ExercisePerformance | undefined;
   suggestion: LoadSuggestion | undefined;
   onLogSet: (args: LogSetArgs) => void;
+  /** Take back a logged set. */
+  onRemoveSet: (setIndex: number, isWarmup: boolean) => void;
   onSkip: () => void;
 };
 
@@ -42,6 +44,7 @@ export const ExerciseLogCard: React.FC<ExerciseLogCardProps> = ({
   last,
   suggestion,
   onLogSet,
+  onRemoveSet,
   onSkip,
 }) => {
   const isHold = slot.targetDurationSec !== undefined;
@@ -70,6 +73,23 @@ export const ExerciseLogCard: React.FC<ExerciseLogCardProps> = ({
   const [drafts, setDrafts] = useState<Record<string, RowDraft>>({});
   const [rpeOpenFor, setRpeOpenFor] = useState<string | null>(null);
   const [warmupCount, setWarmupCount] = useState<number>(0);
+  const [extraSets, setExtraSets] = useState<number>(0);
+
+  // Show whichever is greater: what was suggested, or what the user actually
+  // logged. A set restored from the log must always have a row, otherwise it
+  // exists in history and is invisible on screen.
+  const loggedWorking = loggedSets.filter((x) => !x.isWarmup);
+  const loggedWarmup = loggedSets.filter((x) => x.isWarmup);
+  const workingRows = Math.max(
+    slot.sets + extraSets,
+    ...loggedWorking.map((x) => x.setIndex + 1),
+    0,
+  );
+  const warmupRows = Math.max(
+    warmupCount,
+    ...loggedWarmup.map((x) => x.setIndex + 1),
+    0,
+  );
 
   const keyOf = (setIndex: number, isWarmup: boolean) =>
     `${isWarmup ? 'w' : 's'}${setIndex}`;
@@ -213,6 +233,11 @@ export const ExerciseLogCard: React.FC<ExerciseLogCardProps> = ({
               if (done && !isDirty(key)) return;
               commit(setIndex, isWarmup);
             }}
+            // Long-press to take it back. Not a visible X on every row: that
+            // is eighteen destructive targets beside a sweaty thumb. The hint
+            // under the rows tells people it is here.
+            onLongPress={() => { if (done) onRemoveSet(setIndex, isWarmup); }}
+            delayLongPress={450}
             activeOpacity={0.6}
             hitSlop={6}
           >
@@ -287,16 +312,32 @@ export const ExerciseLogCard: React.FC<ExerciseLogCardProps> = ({
         <Text style={styles.skippedNote}>Skipped</Text>
       ) : (
         <View style={styles.rows}>
-          {Array.from({ length: warmupCount }, (_, i) => renderRow(i, true))}
-          {Array.from({ length: slot.sets }, (_, i) => renderRow(i, false))}
+          {Array.from({ length: warmupRows }, (_, i) => renderRow(i, true))}
+          {Array.from({ length: workingRows }, (_, i) => renderRow(i, false))}
 
-          <TouchableOpacity
-            style={styles.addWarmup}
-            onPress={() => setWarmupCount((n) => Math.min(8, n + 1))}
-            activeOpacity={0.6}
-          >
-            <Text style={styles.addWarmupText}>+ warmup set</Text>
-          </TouchableOpacity>
+          {/* The prescribed count is a SUGGESTION. `logSet` used to throw
+              "Set 4 exceeds the 3 prescribed", so if you did five you could
+              only record three — and the two the app refused were the ones
+              that said you had more in the tank. */}
+          {loggedWorking.length + loggedWarmup.length > 0 && (
+            <Text style={styles.undoHint}>Long-press a ✓ to take that set back</Text>
+          )}
+          <View style={styles.addRow}>
+            <TouchableOpacity
+              style={styles.addBtn}
+              onPress={() => setExtraSets((n) => n + 1)}
+              activeOpacity={0.6}
+            >
+              <Text style={styles.addText}>+ set</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.addBtn}
+              onPress={() => setWarmupCount((n) => Math.min(8, n + 1))}
+              activeOpacity={0.6}
+            >
+              <Text style={styles.addText}>+ warm-up</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
     </View>
@@ -403,6 +444,8 @@ const styles = StyleSheet.create({
   rpeChipOn: { backgroundColor: colors.text },
   rpeChipText: { fontSize: 13, fontWeight: '600', color: colors.textMuted },
   rpeChipTextOn: { color: colors.background },
-  addWarmup: { paddingLeft: 42, paddingVertical: 8 },
-  addWarmupText: { fontSize: 13, color: colors.textMuted },
+  undoHint: { fontSize: 12, color: colors.textTertiary, paddingLeft: 42, paddingTop: 4 },
+  addRow: { flexDirection: 'row', gap: 8, paddingLeft: 42, paddingVertical: 6 },
+  addBtn: { minHeight: 40, paddingHorizontal: 12, justifyContent: 'center' },
+  addText: { fontSize: 14, color: colors.primary, fontWeight: '500' },
 });

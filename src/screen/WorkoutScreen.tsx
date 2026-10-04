@@ -19,7 +19,7 @@ export default function WorkoutScreen({
 }: RootStackScreenProps<'Workout'>): React.ReactElement {
   const {
     userData, todaysSession, currentDay, adherence, exerciseHistory, suggestions,
-    beginSession, recordSet, dropExercise, finishSession, skipToday,
+    beginSession, recordSet, dropSet, dropExercise, finishSession, skipToday,
   } = useFitness();
 
 
@@ -229,6 +229,16 @@ export default function WorkoutScreen({
               last={exerciseHistory[slot.exerciseId]?.[0]}
               suggestion={suggestions[slot.exerciseId]}
               onLogSet={handleLogSet(slot.exerciseId)}
+              onRemoveSet={(setIndex, isWarmup) => {
+                void dropSet({
+                  sessionId: session.sessionId,
+                  exerciseId: slot.exerciseId,
+                  setIndex,
+                  ...(isWarmup ? { isWarmup: true } : {}),
+                }).catch((e: unknown) => {
+                  Alert.alert("Couldn't remove that set", e instanceof Error ? e.message : String(e));
+                });
+              }}
               onSkip={handleSkipExercise(slot.exerciseId)}
             />
           ))}

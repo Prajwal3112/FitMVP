@@ -79,6 +79,7 @@ import {
   startSession,
   logSet,
   skipExercise,
+  removeSet,
   completeSession,
   skipSession,
   type SessionContext as CommandContext,
@@ -121,6 +122,8 @@ export type FitnessContextValue = {
   exerciseHistory: ExerciseHistory;
   /** "You've hit 17 of your last 20." Replaces the consecutive-day streak. */
   adherence: AdherenceWindow;
+  /** Take back a logged set. See removeSet — the app suggests, it does not enforce. */
+  dropSet: (input: { sessionId: string; exerciseId: string; setIndex: number; isWarmup?: boolean }) => Promise<void>;
   /** RPE-derived load suggestions for today's session, by exerciseId. */
   suggestions: Record<string, LoadSuggestion>;
   /** Graded re-entry after a gap. `speak: false` means there is no gap worth naming. */
@@ -417,6 +420,14 @@ export const FitnessProvider: React.FC<{ children: ReactNode }> = ({ children })
     [commandCtx, applyOneEvent],
   );
 
+  const dropSet = useCallback(
+    async (input: { sessionId: string; exerciseId: string; setIndex: number; isWarmup?: boolean }) => {
+      const event = await removeSet(commandCtx(), input);
+      applyOneEvent(event);
+    },
+    [commandCtx, applyOneEvent],
+  );
+
   const dropExercise = useCallback(
     async (sessionId: string, exerciseId: string) => {
       await skipExercise(commandCtx(), sessionId, exerciseId);
@@ -675,6 +686,7 @@ export const FitnessProvider: React.FC<{ children: ReactNode }> = ({ children })
       submitCheckin,
       beginSession,
       recordSet,
+      dropSet,
       dropExercise,
       finishSession,
       skipToday,
@@ -709,6 +721,7 @@ export const FitnessProvider: React.FC<{ children: ReactNode }> = ({ children })
       submitCheckin,
       beginSession,
       recordSet,
+      dropSet,
       dropExercise,
       finishSession,
       skipToday,

@@ -237,6 +237,24 @@ export function applySessionEvent(
       });
     }
 
+    case 'SetRemoved': {
+      const p = event.payload;
+      const isWarmup = p.isWarmup === true;
+      // Filters the pair out rather than erasing anything — the original
+      // SetCompleted stays in the log, which is what keeps the chain intact
+      // and history replayable.
+      return patch(state, p.sessionId, event.seq, (s) => ({
+        ...s,
+        setLog: s.setLog.filter(
+          (x) => !(
+            x.exerciseId === p.exerciseId &&
+            x.setIndex === p.setIndex &&
+            x.isWarmup === isWarmup
+          ),
+        ),
+      }));
+    }
+
     case 'ExerciseSkipped':
       return patch(state, event.payload.sessionId, event.seq, (s) => ({
         ...s,
