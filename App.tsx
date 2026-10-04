@@ -86,7 +86,7 @@ export default function App(): React.ReactElement {
           activeOpacity={0.7}
           style={{ backgroundColor: colors.primary, borderRadius: 12, minHeight: 52, paddingHorizontal: 28, alignItems: 'center', justifyContent: 'center' }}
         >
-          <Text style={{ color: '#FFFFFF', fontSize: 17, fontWeight: '600' }}>Send the report</Text>
+          <Text style={{ color: colors.onPrimary, fontSize: 17, fontWeight: '600' }}>Send the report</Text>
         </TouchableOpacity>
       </View>
     );
@@ -119,7 +119,7 @@ export default function App(): React.ReactElement {
           activeOpacity={0.7}
           style={{ backgroundColor: colors.primary, borderRadius: 12, minHeight: 52, alignItems: 'center', justifyContent: 'center' }}
         >
-          <Text style={{ color: '#FFFFFF', fontSize: 17, fontWeight: '600' }}>Send the report</Text>
+          <Text style={{ color: colors.onPrimary, fontSize: 17, fontWeight: '600' }}>Send the report</Text>
         </TouchableOpacity>
 
         {/*
@@ -182,7 +182,8 @@ export default function App(): React.ReactElement {
     <SafeAreaProvider>
       <ErrorBoundary>
         <FitnessProvider>
-          <StatusBar style="dark" />
+          {/* light glyphs: the ground is dark now */}
+          <StatusBar style="light" />
           <NavigationContainer>
             <RootNavigator />
           </NavigationContainer>

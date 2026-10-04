@@ -80,7 +80,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary, borderRadius: 12, minHeight: 52,
     alignItems: 'center', justifyContent: 'center', marginTop: 10,
   },
-  primaryText: { color: '#FFFFFF', fontSize: 17, fontWeight: '600' },
+  primaryText: { color: colors.onPrimary, fontSize: 17, fontWeight: '600' },
   secondary: {
     backgroundColor: colors.card, borderRadius: 12, minHeight: 52,
     alignItems: 'center', justifyContent: 'center', marginTop: 10,

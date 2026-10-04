@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
   },
   pillOn: { backgroundColor: colors.primary, borderColor: colors.primary },
   pillText: { fontSize: 15, color: colors.text },
-  pillTextOn: { color: '#FFFFFF', fontWeight: '600' },
+  pillTextOn: { color: colors.onPrimary, fontWeight: '600' },
   done: {
     marginTop: 44, minHeight: 52, borderRadius: 12,
     backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center',

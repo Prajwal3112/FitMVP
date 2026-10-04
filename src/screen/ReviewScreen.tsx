@@ -181,8 +181,8 @@ const styles = StyleSheet.create({
   verdictOn: { backgroundColor: colors.primary, borderColor: colors.primary },
   verdictLabel: { fontSize: 18, fontWeight: '600', color: colors.text },
   verdictSub: { fontSize: 14, color: colors.textMuted, marginTop: 3 },
-  onText: { color: '#FFFFFF' },
-  onSubText: { color: 'rgba(255,255,255,0.82)' },
+  onText: { color: colors.onPrimary },
+  onSubText: { color: colors.onPrimary, opacity: 0.78 },
   section: {
     ...typography.sectionHeader, marginTop: 28, marginBottom: 10, marginLeft: 2,
   },

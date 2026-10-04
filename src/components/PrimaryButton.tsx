@@ -52,6 +52,8 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
             styles.text,
             isSecondary && styles.textSecondary,
             isDestructive && styles.textDestructive,
+            // Last, so it wins: dark-on-accent is unreadable on a grey fill.
+            disabled && styles.textDisabled,
           ]}
         >
           {title}
@@ -80,7 +82,9 @@ const styles = StyleSheet.create({
   disabled: {
     backgroundColor: colors.disabledFill,
   },
-  text: { fontSize: 17, fontWeight: '600', color: '#fff' },
+  // Dark on the accent, not white — the accent is a light sage.
+  text: { fontSize: 17, fontWeight: '600', color: colors.onPrimary },
+  textDisabled: { color: colors.textTertiary },
   textSecondary: { color: colors.primary },
   textDestructive: { color: colors.destructive },
 });

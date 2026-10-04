@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
   reasonDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.separator },
   reasonText: { fontSize: 15, lineHeight: 21, color: colors.text },
   droppedName: { fontSize: 15, fontWeight: '500', color: colors.text },
-  droppedWhy: { fontSize: 13, lineHeight: 18, color: colors.textMuted, marginTop: 3 },
+  droppedWhy: { fontSize: 13, lineHeight: 18, color: colors.caution, marginTop: 3 },
   contextWrap: { marginTop: 28 },
   section: {
     ...typography.sectionHeader,

@@ -387,7 +387,7 @@ const styles = StyleSheet.create({
   },
   tickOn: { backgroundColor: colors.primary, borderColor: colors.primary },
   tickMark: { fontSize: 14, color: 'transparent' },
-  tickMarkOn: { color: '#FFFFFF' },
+  tickMarkOn: { color: colors.onPrimary },
   mobName: { flex: 1, fontSize: 16, color: colors.text },
   mobNameDone: { color: colors.textTertiary, textDecorationLine: 'line-through' },
   coolNote: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 12 },
