@@ -69,6 +69,7 @@ import { buildSessionDraft, type ScheduledSessionDraft } from '../session/schedu
 import { buildDigest } from '../dev/digest';
 import { exportLogToFile, type ExportResult } from '../dev/exportFile';
 import { nutritionTargets, type NutritionTargets } from '../nutrition/targets';
+import { selectWhatWorks, selectWhatWorksGap, type Insight } from '../projections/whatWorks';
 import { APP_BUILD } from '../constants/build';
 import {
   selectContextCompleteness,
@@ -171,6 +172,12 @@ export type FitnessContextValue = {
   nutrition: NutritionTargets | null;
   /** Whether height, age and sex have been given rather than defaulted. */
   profileComplete: boolean;
+  /** Every session ever, for the history screen. */
+  sessions: SessionsProjection;
+  /** What the log says works for you. Empty until there is enough of it. */
+  whatWorks: Insight[];
+  /** Why `whatWorks` is quiet, or null when it isn't. */
+  whatWorksGap: string | null;
   /** Raw setup, for the screen that edits it. */
   setup: {
     equipment: UserContextProjection['equipment'];
@@ -669,6 +676,9 @@ export const FitnessProvider: React.FC<{ children: ReactNode }> = ({ children })
     });
   }, [profile, profileComplete, daysPerWeek, goalKind]);
 
+  const whatWorks = useMemo(() => selectWhatWorks(sessions), [sessions]);
+  const whatWorksGap = useMemo(() => selectWhatWorksGap(sessions), [sessions]);
+
   const exportBackup = useCallback(() => exportLogToFile(), []);
 
   const exportDigest = useCallback(
@@ -712,6 +722,9 @@ export const FitnessProvider: React.FC<{ children: ReactNode }> = ({ children })
       logHealth,
       nutrition,
       profileComplete,
+      sessions,
+      whatWorks,
+      whatWorksGap,
       updateSetup,
       setup: {
         equipment: userContext.equipment,
@@ -757,6 +770,9 @@ export const FitnessProvider: React.FC<{ children: ReactNode }> = ({ children })
       logHealth,
       nutrition,
       profileComplete,
+      sessions,
+      whatWorks,
+      whatWorksGap,
       updateSetup,
       userContext,
       daysPerWeek,

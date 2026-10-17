@@ -25,6 +25,8 @@ export type RootStackParamList = {
    */
   Review: { sessionId: string };
   Completion: undefined;
+  /** Your record: every session, and what the log says works for you. */
+  History: undefined;
   /** Change an onboarding answer after the fact. */
   Setup: undefined;
   /** Dev-only. Registered and reachable only when __DEV__ is true. */

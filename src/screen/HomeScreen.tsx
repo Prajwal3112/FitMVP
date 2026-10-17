@@ -304,6 +304,20 @@ export default function HomeScreen({
           </Text>
         )}
 
+        {/* The way in to the record. Until now the app had nine routes and
+            not one of them was a log — the founder's own stated purpose is
+            "see what you had been doing for long, and what works for them". */}
+        <TouchableOpacity
+          onPress={() => navigation.navigate('History')}
+          activeOpacity={0.6}
+          style={styles.historyRow}
+        >
+          <Text style={styles.historyText}>
+            Your record{streak.totalCompleted > 0 ? ` · ${streak.totalCompleted} session${streak.totalCompleted === 1 ? '' : 's'}` : ''}
+          </Text>
+          <Text style={styles.chevron}>›</Text>
+        </TouchableOpacity>
+
         <TouchableOpacity onPress={handleBackup} activeOpacity={0.6} style={styles.shareRow}>
           <Text style={styles.shareText}>
             {backingUp ? 'Saving a backup…' : 'Save a backup of my training log'}
@@ -406,6 +420,12 @@ const styles = StyleSheet.create({
   alarmTitle: { fontSize: 16, fontWeight: '700', color: colors.destructive },
   alarmBody: { fontSize: 14, lineHeight: 20, color: colors.text, marginTop: 8 },
   alarmAction: { fontSize: 15, fontWeight: '600', color: colors.primary, marginTop: 12 },
+  historyRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: colors.card, borderRadius: 10,
+    paddingHorizontal: 16, minHeight: 56, marginTop: 28,
+  },
+  historyText: { fontSize: 17, fontWeight: '500', color: colors.text },
   shareRow: { marginTop: 40, minHeight: 44, justifyContent: 'center' },
   backupNote: {
     fontSize: 12, lineHeight: 17, color: colors.textTertiary,

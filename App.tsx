@@ -13,6 +13,7 @@ import OnboardingScreen from './src/screen/OnboardingScreen';
 import HomeScreen from './src/screen/HomeScreen';
 import GoalScreen from './src/screen/GoalScreen';
 import SetupScreen from './src/screen/SetupScreen';
+import HistoryScreen from './src/screen/HistoryScreen';
 import ReviewScreen from './src/screen/ReviewScreen';
 import CheckinScreen from './src/screen/CheckinScreen';
 import DevScreen from './src/screen/DevScreen';
@@ -260,6 +261,7 @@ function RootNavigator(): React.ReactElement {
         }}
       />
 
+      <Stack.Screen name="History" component={HistoryScreen} options={{ title: '' }} />
       <Stack.Screen name="Setup" component={SetupScreen} options={{ title: '' }} />
 
       {__DEV__ && (
