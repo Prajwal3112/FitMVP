@@ -81,6 +81,30 @@ export function applyUserContextEvent(
           next.constraints = { ...next.constraints, sessionMaxMinutes: after };
         }
         break;
+      // Profile fields. Needed because nutritionTargets() consumes height,
+      // age and sex — the three that onboarding DEFAULTS rather than asks
+      // (height 170cm, sex 'other'), so a calorie target computed before
+      // these are set would be built on fabricated numbers.
+      case 'profile.height_cm':
+        if (typeof after === 'number' && after > 0 && after <= 300 && next.profile) {
+          next.profile = { ...next.profile, height_cm: after };
+        }
+        break;
+      case 'profile.weight_kg':
+        if (typeof after === 'number' && after > 0 && after <= 500 && next.profile) {
+          next.profile = { ...next.profile, weight_kg: after };
+        }
+        break;
+      case 'profile.age':
+        if (typeof after === 'number' && Number.isInteger(after) && after >= 0 && after <= 150 && next.profile) {
+          next.profile = { ...next.profile, age: after };
+        }
+        break;
+      case 'profile.sex':
+        if (after === 'm' || after === 'f' || after === 'other') {
+          if (next.profile) next.profile = { ...next.profile, sex: after };
+        }
+        break;
       case 'ownedEquipment':
         if (Array.isArray(after)) next.ownedEquipment = after as OwnedEquipment[];
         break;

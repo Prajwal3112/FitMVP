@@ -68,6 +68,7 @@ import { reentryPolicy, scaleLoad, type ReentryPolicy } from '../session/reentry
 import { buildSessionDraft, type ScheduledSessionDraft } from '../session/scheduler';
 import { buildDigest } from '../dev/digest';
 import { exportLogToFile, type ExportResult } from '../dev/exportFile';
+import { nutritionTargets, type NutritionTargets } from '../nutrition/targets';
 import { APP_BUILD } from '../constants/build';
 import {
   selectContextCompleteness,
@@ -160,6 +161,16 @@ export type FitnessContextValue = {
    * answers stay in the log and the change is dated.
    */
   updateSetup: (field: string, after: unknown) => Promise<void>;
+  /**
+   * Calorie and macro targets, or null until the profile has real numbers.
+   *
+   * Null rather than a guess on purpose: onboarding defaults height to 170cm
+   * and sex to 'other', and a calorie target built on a fabricated height is
+   * worse than no target. `profileComplete` says whether we can compute.
+   */
+  nutrition: NutritionTargets | null;
+  /** Whether height, age and sex have been given rather than defaulted. */
+  profileComplete: boolean;
   /** Raw setup, for the screen that edits it. */
   setup: {
     equipment: UserContextProjection['equipment'];
@@ -168,6 +179,10 @@ export type FitnessContextValue = {
     knownInjuries: string[];
     daysPerWeek: number;
     sessionMaxMinutes: number;
+    /** Undefined until given — see profileComplete. */
+    heightCm: number | undefined;
+    age: number | undefined;
+    sex: 'm' | 'f' | 'other' | undefined;
   };
 
   submitOnboarding: (form: OnboardingForm) => Promise<void>;
@@ -631,6 +646,29 @@ export const FitnessProvider: React.FC<{ children: ReactNode }> = ({ children })
     [refreshProjections, userContext],
   );
 
+  // `sex: 'other'` and `height_cm: 170` are what onboarding writes when it
+  // does not ask, so treat those exact values as "not yet told" rather than
+  // as answers. Imperfect — someone genuinely 170cm has to re-enter it — but
+  // it beats presenting a calorie target derived from a default.
+  const profile = userContext.profile;
+  const profileComplete =
+    profile !== null &&
+    profile.age !== undefined &&
+    profile.sex !== 'other' &&
+    profile.height_cm !== 170;
+
+  const nutrition = useMemo<NutritionTargets | null>(() => {
+    if (profile === null || !profileComplete) return null;
+    return nutritionTargets({
+      weightKg: profile.weight_kg,
+      heightCm: profile.height_cm,
+      ...(profile.age !== undefined ? { age: profile.age } : {}),
+      sex: profile.sex,
+      daysPerWeek,
+      goal: goalKind,
+    });
+  }, [profile, profileComplete, daysPerWeek, goalKind]);
+
   const exportBackup = useCallback(() => exportLogToFile(), []);
 
   const exportDigest = useCallback(
@@ -672,6 +710,8 @@ export const FitnessProvider: React.FC<{ children: ReactNode }> = ({ children })
       exportDigest,
       exportBackup,
       logHealth,
+      nutrition,
+      profileComplete,
       updateSetup,
       setup: {
         equipment: userContext.equipment,
@@ -680,6 +720,9 @@ export const FitnessProvider: React.FC<{ children: ReactNode }> = ({ children })
         knownInjuries: userContext.knownInjuries,
         daysPerWeek,
         sessionMaxMinutes,
+        heightCm: profile?.height_cm,
+        age: profile?.age,
+        sex: profile?.sex,
       },
       submitOnboarding,
       submitGoal,
@@ -712,6 +755,8 @@ export const FitnessProvider: React.FC<{ children: ReactNode }> = ({ children })
       exportDigest,
       exportBackup,
       logHealth,
+      nutrition,
+      profileComplete,
       updateSetup,
       userContext,
       daysPerWeek,

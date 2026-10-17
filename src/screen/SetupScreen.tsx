@@ -55,7 +55,7 @@ const LEVELS: { label: string; value: Experience }[] = [
 export default function SetupScreen({
   navigation,
 }: RootStackScreenProps<'Setup'>): React.ReactElement {
-  const { setup, updateSetup } = useFitness();
+  const { setup, updateSetup, nutrition, profileComplete } = useFitness();
   const [busy, setBusy] = useState(false);
 
   const save = (field: string, after: unknown) => {
@@ -166,6 +166,73 @@ export default function SetupScreen({
           ))}
         </View>
 
+        {/* These three exist so the calorie and macro targets can be computed.
+            Onboarding defaults height to 170cm and sex to 'other' rather than
+            asking, so until they are given here, nutrition shows nothing
+            rather than a number built on a default. */}
+        <Text style={styles.section}>YOU</Text>
+        <Text style={styles.hint}>
+          Only used to work out your calorie and protein targets. Nothing else
+          reads it, and it never leaves your phone.
+        </Text>
+        <View style={styles.row}>
+          {(['m', 'f', 'other'] as const).map((v) => (
+            <Pill
+              key={v}
+              label={v === 'm' ? 'Male' : v === 'f' ? 'Female' : 'Prefer not to say'}
+              on={setup.sex === v}
+              onPress={() => save('profile.sex', v)}
+            />
+          ))}
+        </View>
+        <View style={styles.row}>
+          {[150, 155, 160, 165, 170, 175, 180, 185, 190].map((cm) => (
+            <Pill key={cm} label={`${cm}cm`} on={setup.heightCm === cm}
+              onPress={() => save('profile.height_cm', cm)} />
+          ))}
+        </View>
+        <View style={styles.row}>
+          {[18, 25, 30, 35, 40, 45, 50, 55, 60, 65].map((a) => (
+            <Pill key={a} label={`${a}s`.replace('18s', 'under 22')} on={setup.age === a}
+              onPress={() => save('profile.age', a)} />
+          ))}
+        </View>
+
+        {nutrition !== null ? (
+          <>
+            <Text style={styles.section}>YOUR TARGETS</Text>
+            <View style={styles.macroCard}>
+              <Text style={styles.kcal}>{nutrition.target}</Text>
+              <Text style={styles.kcalUnit}>calories a day</Text>
+              <View style={styles.macroRow}>
+                {[
+                  ['Protein', nutrition.protein],
+                  ['Carbs', nutrition.carbs],
+                  ['Fat', nutrition.fat],
+                ].map(([label, m]) => {
+                  const macro = m as typeof nutrition.protein;
+                  return (
+                    <View key={label as string} style={styles.macro}>
+                      <Text style={styles.macroG}>{macro.grams}g</Text>
+                      <Text style={styles.macroLabel}>{label as string}</Text>
+                      <Text style={styles.macroPct}>{macro.pct}%</Text>
+                    </View>
+                  );
+                })}
+              </View>
+              {nutrition.notes.map((n, i) => (
+                <Text key={i} style={styles.macroNote}>{n}</Text>
+              ))}
+            </View>
+          </>
+        ) : (
+          <Text style={styles.hint}>
+            {profileComplete
+              ? ''
+              : 'Pick a sex, height and age above and I can work out your calorie and protein targets.'}
+          </Text>
+        )}
+
         <TouchableOpacity style={styles.done} onPress={() => navigation.goBack()} activeOpacity={0.7}>
           <Text style={styles.doneText}>Done</Text>
         </TouchableOpacity>
@@ -192,6 +259,20 @@ const styles = StyleSheet.create({
   pillOn: { backgroundColor: colors.primary, borderColor: colors.primary },
   pillText: { fontSize: 15, color: colors.text },
   pillTextOn: { color: colors.onPrimary, fontWeight: '600' },
+  macroCard: {
+    backgroundColor: colors.card, borderRadius: 12, padding: 18, marginTop: 4,
+  },
+  kcal: { fontSize: 40, fontWeight: '700', color: colors.primary, letterSpacing: -1 },
+  kcalUnit: { fontSize: 14, color: colors.textMuted, marginTop: -2 },
+  macroRow: { flexDirection: 'row', gap: 10, marginTop: 18 },
+  macro: {
+    flex: 1, backgroundColor: colors.raised, borderRadius: 10,
+    paddingVertical: 12, alignItems: 'center',
+  },
+  macroG: { fontSize: 19, fontWeight: '700', color: colors.text },
+  macroLabel: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  macroPct: { fontSize: 11, color: colors.textTertiary, marginTop: 1 },
+  macroNote: { fontSize: 13, lineHeight: 19, color: colors.textMuted, marginTop: 12 },
   done: {
     marginTop: 44, minHeight: 52, borderRadius: 12,
     backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center',
