@@ -823,6 +823,124 @@ head-to-head comparisons, with safety problems in 14 of 24. So:
 The LLM interprets semantics (*"slept 5 hours, shoulder is off, 35 minutes,
 bench is taken"*) into a state the rules can act on. It never emits a load.
 
+### EVIDENCE, 2026-10-17 — two research passes, with sources
+Findings, **not decisions**. The direction is not revised until the founder
+says so. Recorded because this cost real effort and would be expensive to lose.
+
+**THE SINGLE MOST FAVOURABLE FINDING — the headline criticism of AI
+programming is a confound that validates adaptive re-prescription.**
+Genç et al., *Physical Activity Review* 2025;13(2):35-44 is the one
+resistance-training head-to-head (20 untrained men, GPT-4 n=10 vs personal
+trainer n=10, 12 weeks) and is cited everywhere as "AI loses to humans". From
+its own methods: the GPT-4 group *"adhered to the same training programme
+without any modifications"* while the trainer group *"underwent reassessment
+of their maximal values at four-week intervals, with the training programme
+adjusted accordingly."* So it is **a frozen programme versus one
+re-prescribed every four weeks** — and the trainer arm was supervised in
+person while the AI arm trained alone. Three further defects: no between-group
+test was ever run (within-group paired t-tests only, so "AI inferior" is
+inferred from differential significance); post-test values are nearly
+identical (right-arm 22.05 vs 22.15 kg — the trainer group merely started
+weaker); the AI group was stronger at baseline on every measure.
+Washif et al. independently name the same gap as ChatGPT's defining failure:
+*"no potential real-time adjustments, or revisions to training protocols,
+based on feedback or individual progression."*
+**Event-sourced re-prescription is on the winning side of the comparison the
+literature actually ran.**
+
+**THE CAPABILITY SPLIT IS EMPIRICAL, NOT TASTE.** D'hoe et al., *J Sports Sci
+Med* 2026;25:235-261: 9 exercise questions, 9 practising personal trainers vs
+ChatGPT-3.5, blind-scored by 27 raters (9 PhDs, 18 PTs) — *"ChatGPT
+outperformed PTs in six of nine questions overall… scores from the answers of
+human PTs were higher in none of the questions."* The SAME model scores
+**2.37/5 at designing programmes**. Explains better than credentialed humans,
+prescribes badly. That makes CLAUDE.md's *"LLM stylizes and explains;
+deterministic code plans and validates"* an evidence-backed design choice.
+⚠ But the capability criticism is dating fast: on the one rubric comparing
+versions (7 CSCS/PhD experts, blinded) GPT-3.5 **2.367** → GPT-4o **3.612** →
+GPT-4.1 **4.143** out of 5. The commercial criticism below is not dating.
+
+**SAFETY — why §8.7/§8.8 must stay deterministic.** He et al., *Biology of
+Sport* 2026;43:949-961 (PRISMA, 24 studies, N=2,512): *"systemic safety flaws
+were identified in 14 of 24 studies (58%), with models recommending
+contraindicated exercises for clinical populations."* Worst case in the
+literature: GPT-4o prescribed heavy lifting and rapid head movements to a
+persona with **diabetic retinopathy**. And from a repeated-generation study:
+*"Safety expression reached ceiling levels across all models"* — every model
+says the safety words, so **safety language is useless as a quality signal.**
+Deterministic injury locks in `buildSessionDraft` are the control nobody has.
+
+**THE COMMERCIAL WALL — this is the part that decides whether it can be a
+business.**
+- ChartMogul, Dec 2025 (~3,500 companies): AI-native gross revenue retention
+  by price band — **>$250/mo 70% · $50-249 45% · under $50/mo 23%.** Their
+  phrase: *"the curse of the AI wrapper. The downside of being easy to buy is
+  being easy to cancel."* Every consumer fitness app except Future and Caliber
+  sits in that 23% band.
+- TrustMRR, 723 payment-verified health & fitness products: **zero AI
+  strength-programming apps in the verified top 30 by all-time revenue.** Five
+  AI *nutrition* apps make it. Across ~15,000 verified startups **67.5% have
+  made $0-1k all-time**; median all-time revenue on RevenueCat is **$375**.
+- **Hevy is $2.99/mo** with adaptive programming bundled free and **no AI SKU
+  at all.** Fitbod $15.99/mo makes **no LLM claim anywhere.**
+- **Ladder** — fastest-growing strength app, ~150,000 paid subs — **markets
+  explicitly against AI**: *"not algorithm-generated"*, *"written by your coach
+  rather than generated on demand."*
+- **Peloton already ran the "will people pay more for AI" experiment.** Shipped
+  Peloton IQ, raised prices: Q4 FY2026 **−247,000 connected subs (−8.8% YoY)**,
+  app subs −9%, churn **1.8% → 2.2%**, then an 11% staff cut. The AI acquired
+  and retained nobody.
+- RevenueCat's AI study (3,519 AI apps): **the fate of an AI subscription is
+  decided at month 1.** Separators — subscription-not-credits +16.4pp, 7-day
+  trial +12.7pp, freemium +11.4pp, **lower price +7.3pp.** Loser markers — no
+  trial +23.7pp, launched 2024-or-later +20.2pp.
+
+**THE LAPSE IS THE BEST-EVIDENCED UNOCCUPIED GROUND — and someone with $9M
+failed at exactly it.** Dick Costolo (ex-Twitter CEO) shut **Chorus** in Feb
+2018 after $9M from Index Ventures. His email to beta users: *"We are more
+interested in solving the churn and motivational dip problem, and we just
+couldn't get there."* Their finding: people who missed their goals *"tended to
+distance themselves from their support network rather than seek
+encouragement."* That is this project's own no-punish-the-lapse stance, found
+in the wild with a primary source. Corroborating: FitDots — *"people
+completing every workout in the app and still quietly losing motivation… the
+AI had no signal for that, because the thing it needed to detect wasn't in the
+data"*; Atlas AI — *"we didn't deliver anything novel for… motivation to show
+up"*; and Lai et al., *JMIR* 2025;27:e79217 — *"None of the studies evaluated
+long-term outcomes, such as sustained behavior change."*
+
+**THE ACQUISITION FACT THAT CONTRADICTS THE AUDIENCE ANSWER.** Ladder:
+**80% of its users were not using a fitness app before joining; 50% had never
+tried one.** That is a FIRST-APP play, not a switching play — and it points at
+beginners. But the validated product gap (per-set autoregulation) serves
+intermediates who already log. **Those are different people.** Also:
+FitnessAI, the biggest indie success here (>$100k MRR, four people), concluded
+*"half of fitness AI is the human touch"* — users valued **tutorials** most,
+and the team **manually messaged every user who skipped the gym.**
+
+**CORRECTIONS TO THINGS THIS SESSION ASSERTED**
+- I cited "AI apps churn 30% faster" as if it bore on fitness. It is
+  **cross-category**, and RevenueCat holds both axes and **explicitly refuses
+  to cross them.** There is **no published evidence** that adding AI to a
+  fitness app helps or hurts retention within fitness — any claim either way
+  is currently unfalsifiable.
+- Every fitness-app D1/D7/D30 figure quoted in this session is unsourceable;
+  AppsFlyer's own portal returns "No platform data available" and the
+  circulating numbers trace to SEO sites citing each other. The one
+  trustworthy abandonment figure is peer-reviewed: Lim et al., *JMIR*
+  2024;26:e56897 — 18 studies, 525,824 participants, **median 70%
+  discontinued within the first 100 days.**
+- **Custom GPTs retire 11 Dec 2026**, revenue share never shipped, ~60% of
+  65,000 GPTs never reached 10 conversations. The Hevy / STAS / Montis
+  integrations cited as "four actors kept the chat" are mid-migration, so that
+  channel is itself unstable.
+
+**FOR STEP 8 WHEN IT COMES.** Bod.Coach measured that asking an LLM for the
+workout as a structured tool call produced *worse* programming than prose —
+*"five reps of barbell curls and then child's pose for 30 minutes"* — fixed by
+chaining prose → JSON in two calls. **Never let the model emit the
+prescription directly.**
+
 ### What the reviews say to do next
 Not "give it to six friends." All three rejected that, for the same reason:
 the findings six testers would return are ones one week of real use surfaces
