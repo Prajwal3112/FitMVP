@@ -7,6 +7,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../constants/colors';
 import { TellMe } from '../components/TellMe';
 import { INJURY_AREAS, areaLabel } from '../data/muscles';
+import {
+  ANCHOR_LIFTS, shouldAskDeclaredLifts, implausibleDeclaredLift,
+} from '../onboarding/declaredLifts';
+import { useLayout } from '../constants/layout';
 import { typography } from '../constants/typography';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { ChipSelector, type ChipOption } from '../components/ChipSelector';
@@ -71,6 +75,7 @@ export default function OnboardingScreen({
   // Spread over the shared initial state so a field added to the form type
   // can never be silently left unseeded here — which is how `age: ''` got
   // into the payload with no input to fill it.
+  const layout = useLayout();
   const [form, setForm] = useState<OnboardingForm>({
     ...emptyOnboardingForm(),
     weight: userData.weight,
@@ -250,6 +255,61 @@ export default function OnboardingScreen({
           {!isValid && !submitting && (
             <Text style={styles.needs}>{invalidReason}</Text>
           )}
+          {/* Only asked of people who have numbers to give. A beginner has
+              none, and asking invites a guess worse than our estimate.
+              Without this, a regular lifter who squats 140kg was offered
+              47.5kg on the first screen they saw — wrong by a factor of
+              three, from a formula, about their own body. */}
+          {shouldAskDeclaredLifts(form.experience) && (
+            <>
+              <Text style={styles.section}>WHAT DO YOU LIFT NOW?</Text>
+              <Text style={styles.hint}>
+                Roughly, for a working set. Skip any you do not know — I will
+                guess those from your bodyweight, and guessing is worse.
+              </Text>
+              {ANCHOR_LIFTS.map((lift) => {
+                const raw = form.declaredLifts[lift.exerciseId];
+                const err = raw !== undefined ? implausibleDeclaredLift(raw) : null;
+                return (
+                  <View key={lift.exerciseId} style={styles.liftRow}>
+                    <Text style={styles.liftLabel}>{lift.label}</Text>
+                    <View style={styles.liftInputWrap}>
+                      <TextInput
+                        style={[styles.liftInput, err !== null && styles.liftInputBad]}
+                        value={raw !== undefined ? String(raw) : ''}
+                        onChangeText={(v) => {
+                          const n = Number(v);
+                          setForm((prev) => {
+                            const next = { ...prev.declaredLifts };
+                            if (v.trim() === '' || !Number.isFinite(n)) {
+                              delete next[lift.exerciseId];
+                            } else {
+                              next[lift.exerciseId] = n;
+                            }
+                            return { ...prev, declaredLifts: next };
+                          });
+                        }}
+                        keyboardType="decimal-pad"
+                        placeholder="—"
+                        placeholderTextColor={colors.textTertiary}
+                        maxLength={5}
+                        selectTextOnFocus
+                      />
+                      <Text style={styles.liftUnit}>kg</Text>
+                    </View>
+                  </View>
+                );
+              })}
+              {ANCHOR_LIFTS.map((lift) => {
+                const raw = form.declaredLifts[lift.exerciseId];
+                const err = raw !== undefined ? implausibleDeclaredLift(raw) : null;
+                return err !== null
+                  ? <Text key={lift.exerciseId} style={styles.liftErr}>{lift.label}: {err}</Text>
+                  : null;
+              })}
+            </>
+          )}
+
           {/* The only screen every tester must pass, and until now the only
               one with no way to report being stuck on it. */}
           <TellMe
@@ -266,6 +326,21 @@ export default function OnboardingScreen({
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   scroll: { paddingHorizontal: 16, paddingBottom: 48, paddingTop: 8 },
+  hint: { fontSize: 13, lineHeight: 19, color: colors.textTertiary, marginBottom: 10 },
+  liftRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: colors.card, borderRadius: 10,
+    paddingHorizontal: 14, minHeight: 56, marginBottom: 8,
+  },
+  liftLabel: { fontSize: 16, color: colors.text, flexShrink: 1 },
+  liftInputWrap: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  liftInput: {
+    minWidth: 68, textAlign: 'right', fontSize: 19, fontWeight: '600',
+    color: colors.text, paddingVertical: 8,
+  },
+  liftInputBad: { color: colors.destructive },
+  liftUnit: { fontSize: 14, color: colors.textMuted },
+  liftErr: { fontSize: 13, color: colors.destructive, marginTop: 2, marginBottom: 6 },
   needs: {
     fontSize: 13, color: colors.textMuted, textAlign: 'center', marginTop: 10,
   },

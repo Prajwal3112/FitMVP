@@ -1,4 +1,5 @@
 import { getExercise, type Exercise } from '../data/exercises';
+import { declaredLoadFor } from '../onboarding/declaredLifts';
 import type { Experience } from '../events/userContext';
 
 // ─── Day-1 starting load ─────────────────────────────────────────────
@@ -68,12 +69,18 @@ export type StartingLoadInput = {
   exerciseId: string;
   bodyweightKg: number;
   experience: Experience | null;
+  /** Lifts the user reported at onboarding. Preferred over any ratio. */
+  declaredLifts?: Record<string, number>;
 };
 
 export type StartingLoadEstimate = {
   /** 0 means bodyweight — there is no load to prescribe. */
   weightKg: number;
-  /** Always true here. The UI must not present this as a known number. */
+  /**
+   * False ONLY when the user declared a number for this exact lift. Otherwise
+   * true and the UI must not present it as known. (Was "always true here" —
+   * declared lifts broke that, 2026-10-17.)
+   */
   isEstimate: boolean;
   reason: string;
 };
@@ -89,6 +96,31 @@ export function estimateStartingLoad(
   const ex = getExercise(input.exerciseId);
   if (!ex) return null;
   if (isUnloaded(ex)) return null; // bodyweight work: reps are the variable
+
+  // A NUMBER THE USER GAVE US BEATS ANY RATIO WE CAN COMPUTE.
+  // Without this, a regular lifter who squats 140kg was offered 47.5kg on the
+  // first screen they saw — wrong by a factor of three, from a formula, about
+  // their own body. See src/onboarding/declaredLifts.ts for why a declared
+  // number is an estimate source and never history.
+  if (input.declaredLifts) {
+    const d = declaredLoadFor(input.exerciseId, ex.pat, input.declaredLifts);
+    if (d !== null) {
+      // `isEstimate` is FALSE only for a number the user gave us for this
+      // exact lift — it is their figure, not our arithmetic. A scaled
+      // variation is still a guess, just a much better-founded one.
+      return d.exact
+        ? {
+            weightKg: d.kg,
+            isEstimate: false,
+            reason: `You told me you lift ${d.kg}kg here.`,
+          }
+        : {
+            weightKg: d.kg,
+            isEstimate: true,
+            reason: `Worked out from the numbers you gave me. Adjust it.`,
+          };
+    }
+  }
 
   const bw = input.bodyweightKg;
   if (!Number.isFinite(bw) || bw <= 0) return null;

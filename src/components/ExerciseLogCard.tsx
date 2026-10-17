@@ -466,7 +466,9 @@ const styles = StyleSheet.create({
   rpeChipText: { fontSize: 13, fontWeight: '600', color: colors.textMuted },
   rpeChipTextOn: { color: colors.background },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  photoToggle: { minHeight: 32, justifyContent: 'center', paddingHorizontal: 2 },
+  // 40 is the floor, not 32. hitSlop already extended the touch area, but a
+  // target that LOOKS smaller than it is still gets missed by a thumb.
+  photoToggle: { minHeight: 40, justifyContent: 'center', paddingHorizontal: 4 },
   photoToggleText: { fontSize: 12, color: colors.primary },
   photo: {
     width: '100%', aspectRatio: 3 / 2, borderRadius: 8,

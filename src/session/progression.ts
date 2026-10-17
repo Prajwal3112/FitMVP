@@ -99,6 +99,8 @@ function hitTarget(perf: ExercisePerformance, targetReps: number | undefined): b
 export type EstimateContext = {
   bodyweightKg: number;
   experience: Experience | null;
+  /** Lifts the user declared at onboarding. Beats any bodyweight ratio. */
+  declaredLifts?: Record<string, number>;
 };
 
 export function suggestLoad(
@@ -114,6 +116,7 @@ export function suggestLoad(
     // an empty box — but never present it as a known number.
     const est = estimate
       ? estimateStartingLoad({
+          ...(estimate.declaredLifts ? { declaredLifts: estimate.declaredLifts } : {}),
           exerciseId: slot.exerciseId,
           bodyweightKg: estimate.bodyweightKg,
           experience: estimate.experience,

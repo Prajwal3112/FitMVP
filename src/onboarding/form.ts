@@ -1,5 +1,6 @@
 import type { Equipment } from '../constants/workouts';
 import type { Experience, OwnedEquipment } from '../events/userContext';
+import type { DeclaredLifts } from './declaredLifts';
 
 /**
  * Onboarding's form shape, validation, and event payload — as plain
@@ -28,6 +29,12 @@ export type OnboardingForm = {
   ownedEquipment: OwnedEquipment[];
   /** Body areas, from INJURY_AREAS in src/data/muscles.ts. */
   injuries: string[];
+  /**
+   * Lifts the user says they already do, keyed by exerciseId. Only asked of
+   * returning/regular/experienced — a beginner has no numbers and asking
+   * invites a guess worse than our estimate.
+   */
+  declaredLifts: DeclaredLifts;
 };
 
 /** Exactly what the screen's useState holds on a cold install. */
@@ -40,6 +47,7 @@ export function emptyOnboardingForm(): OnboardingForm {
     daysPerWeek: null,
     ownedEquipment: [],
     injuries: [],
+    declaredLifts: {},
   };
 }
 
@@ -99,6 +107,9 @@ export function formToOnboardingPayload(form: OnboardingForm) {
       sessionMaxMinutes: DEFAULT_SESSION_MAX_MINUTES,
     },
     knownInjuries: form.injuries,
+    ...(Object.keys(form.declaredLifts).length > 0
+      ? { declaredLifts: form.declaredLifts }
+      : {}),
     dayRolloverHour: DEFAULT_ROLLOVER_HOUR,
     experience,
     ownedEquipment: form.ownedEquipment,

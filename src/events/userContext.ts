@@ -65,6 +65,18 @@ export type OwnedEquipment = z.infer<typeof OwnedEquipmentEnum>;
 
 export type Constraints = z.infer<typeof ConstraintsSchema>;
 
+/**
+ * Lifts the user says they can already do, keyed by exerciseId.
+ *
+ * ADDITIVE-OPTIONAL, so no schemaVersion bump. Declared, never performed —
+ * see src/onboarding/declaredLifts.ts for why these must not be written as
+ * synthetic SetCompleted events.
+ */
+export const DeclaredLiftsSchema = z.record(
+  z.string().min(1),
+  z.number().positive().max(500),
+);
+
 // ─── UserContextCreated (v1) ─────────────────────────────────────────
 
 export const USER_CONTEXT_CREATED_VERSION = 1;
@@ -79,6 +91,7 @@ export const UserContextCreatedPayloadSchema = z.object({
   // Additive + optional: every payload written before these existed still
   // validates, so no schemaVersion bump and no upcaster (see §15 rule).
   experience: ExperienceEnum.optional(),
+  declaredLifts: DeclaredLiftsSchema.optional(),
   ownedEquipment: z.array(OwnedEquipmentEnum).optional(),
 });
 

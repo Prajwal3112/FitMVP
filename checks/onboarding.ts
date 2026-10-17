@@ -47,10 +47,22 @@ ck('the payload passes its own Zod schema', parsed.success,
 ck('daysPerWeek reaches the payload', payload.constraints.daysPerWeek === 3);
 ck('experience reaches the payload', payload.experience === 'regular');
 ck('bodyweight reaches the payload', payload.profile.weight_kg === 74);
+// Declared lifts are optional and must be ABSENT, not an empty object, when
+// nobody gave any — an empty record would make startingLoad think it had data.
+ck('no declaredLifts key when none were given',
+  !('declaredLifts' in payload), JSON.stringify(Object.keys(payload)));
+const withLifts = formToOnboardingPayload({
+  ...filled, declaredLifts: { Barbell_Squat: 140 },
+});
+ck('declared lifts reach the payload when given',
+  (withLifts as { declaredLifts?: Record<string, number> }).declaredLifts?.['Barbell_Squat'] === 140);
 ck('equipment reaches the payload', payload.equipment === 'gym');
 
 // ── nothing is required that the screen never asks ──
-const ONSCREEN = ['weight', 'workoutTime', 'equipment', 'experience', 'daysPerWeek', 'ownedEquipment', 'injuries'];
+// Every field here must be fillable on screen. `declaredLifts` is asked only
+// of returning/regular/experienced — see shouldAskDeclaredLifts — which still
+// counts as fillable; a beginner leaving it empty is the intended path.
+const ONSCREEN = ['weight', 'workoutTime', 'equipment', 'experience', 'daysPerWeek', 'ownedEquipment', 'injuries', 'declaredLifts'];
 const keys = Object.keys(emptyForm());
 ck('the form type has no field the screen cannot fill',
   keys.every((k) => ONSCREEN.includes(k)), keys.filter((k) => !ONSCREEN.includes(k)).join(','));

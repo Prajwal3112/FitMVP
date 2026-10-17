@@ -74,6 +74,7 @@ const EXERCISE_IMAGES: Record<string, ImageSourcePropType> = {
   'Handstand_Push-Ups': require('./img/Handstand_Push-Ups.jpg'),
   'Incline_Dumbbell_Flyes': require('./img/Incline_Dumbbell_Flyes.jpg'),
   'Incline_Dumbbell_Press': require('./img/Incline_Dumbbell_Press.jpg'),
+  'Incline_Push-Up_Close-Grip': require('./img/Incline_Push-Up_Close-Grip.jpg'),
   'Incline_Push-Up_Reverse_Grip': require('./img/Incline_Push-Up_Reverse_Grip.jpg'),
   'Leg_Extensions': require('./img/Leg_Extensions.jpg'),
   'Leg_Press': require('./img/Leg_Press.jpg'),

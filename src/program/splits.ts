@@ -33,8 +33,23 @@ export type Tier = 'novice' | 'intermediate' | 'advanced';
 
 export function tierOf(exp: Experience | null): Tier {
   if (exp === 'experienced') return 'advanced';
-  if (exp === 'regular') return 'intermediate';
-  return 'novice'; // 'new', 'returning', or unknown
+  // 'returning' is INTERMEDIATE, not novice.
+  //
+  // It used to fall through to novice, so someone coming back after six months
+  // off got a total beginner's volume (12 sets vs 18) and a beginner-capped
+  // exercise library — identical to someone who had never trained. Wrong twice
+  // over: muscle memory is real and a returner regains far faster than a novice
+  // builds, and "coming back after a break" is the exact person this app's
+  // whole re-entry thesis is about. The app asked the question and then threw
+  // the answer away.
+  //
+  // The volume reduction a returner genuinely needs belongs to
+  // `reentryPolicy`, which is gap-aware and graded — not to a permanent
+  // downgrade of who they are. A fresh install has no gap to measure, so
+  // `startingLoad`'s experience factor (0.75x) carries the first session and
+  // the policy takes over once there is a gap to see.
+  if (exp === 'regular' || exp === 'returning') return 'intermediate';
+  return 'novice'; // 'new', or unknown
 }
 
 export type SplitChoice = {

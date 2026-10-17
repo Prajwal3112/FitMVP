@@ -15,6 +15,8 @@ export type UserContextProjection = {
   knownInjuries: string[];
   dayRolloverHour: number;
   experience: Experience | null;
+  /** Lifts the user declared at onboarding. Declared, not performed. */
+  declaredLifts: Record<string, number>;
   ownedEquipment: OwnedEquipment[];
   lastSeq: number;            // last event seq folded into this state
 };
@@ -28,6 +30,7 @@ export const INITIAL_USER_CONTEXT: UserContextProjection = {
   knownInjuries: [],
   dayRolloverHour: 4,
   experience: null,
+  declaredLifts: {},
   ownedEquipment: [],
   lastSeq: -1,
 };
@@ -50,6 +53,7 @@ export function applyUserContextEvent(
       knownInjuries: event.payload.knownInjuries,
       dayRolloverHour: event.payload.dayRolloverHour,
       experience: event.payload.experience ?? null,
+      declaredLifts: event.payload.declaredLifts ?? {},
       ownedEquipment: event.payload.ownedEquipment ?? [],
       lastSeq: event.seq,
     };
@@ -103,6 +107,15 @@ export function applyUserContextEvent(
       case 'profile.sex':
         if (after === 'm' || after === 'f' || after === 'other') {
           if (next.profile) next.profile = { ...next.profile, sex: after };
+        }
+        break;
+      case 'declaredLifts':
+        if (after !== null && typeof after === 'object' && !Array.isArray(after)) {
+          const out: Record<string, number> = {};
+          for (const [k, v] of Object.entries(after as Record<string, unknown>)) {
+            if (typeof v === 'number' && v > 0 && v <= 500) out[k] = v;
+          }
+          next.declaredLifts = out;
         }
         break;
       case 'ownedEquipment':

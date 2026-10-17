@@ -591,7 +591,7 @@ export const FitnessProvider: React.FC<{ children: ReactNode }> = ({ children })
         : sg;
     }
     return scaled;
-  }, [todaysSession, exerciseHistory, userContext.profile, userContext.experience, reentry]);
+  }, [todaysSession, exerciseHistory, userContext.profile, userContext.experience, userContext.declaredLifts, reentry]);
 
   // ── The Home preview ────────────────────────────────────────────────
   // Built by the SAME engine that will build the real session, from a
