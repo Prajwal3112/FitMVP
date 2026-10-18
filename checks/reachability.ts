@@ -167,12 +167,12 @@ for (const [label, re] of pixel) {
   if (!rendered) noPixel.push(label);
   console.log(`  ${rendered ? 'rendered  ' : 'NO PIXEL  '} ${label}`);
 }
-// Was 6 of 6 with no pixel. warmup / cooldown / dropped / reasons[1..] are
-// now rendered; targetRpe and restSec remain (CLAUDE.md "Still open" item 6).
-ck('warmup, cooldown, dropped and the full reasons list all reach a screen',
-  noPixel.length <= 2, noPixel.join(', '));
-console.log('\n  (NO PIXEL entries are computed every check-in and discarded —');
-console.log('   tracked as items 1, 2 and 6 in CLAUDE.md "Still open".)');
+// Was 6 of 6 with no pixel. Now 0 — targetRpe and restSec were the last two,
+// and they reach WorkoutScreen as one "how to run today" line (2026-10-18).
+// The bar only goes up from here: a new entry in PIXEL_PROBES that nothing
+// renders fails this check, which is the whole point of having it.
+ck('everything the scheduler computes reaches a screen',
+  noPixel.length === 0, noPixel.join(', '));
 
 console.log(fails === 0 ? '\nall passed' : `\n${fails} FAILURE(S)`);
 if (fails > 0) process.exit(1);

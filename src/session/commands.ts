@@ -197,6 +197,7 @@ export async function checkInAndSchedule(
       cooldown: draft.cooldown.map((w) => ({ id: w.id, name: w.name })),
       dropped: draft.dropped,
       reasons: draft.reasons.filter((r) => r.trim().length > 0).slice(0, 8),
+      restSec: draft.restSec,
     }),
     {
       rolloverHour: ctx.rolloverHour,

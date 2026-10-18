@@ -115,6 +115,17 @@ export const SessionScheduledPayloadSchema = z.object({
    * all lived past `reasons[0]` and Home rendered `reasons[0]` alone.
    */
   reasons: z.array(z.string().max(300)).max(8).optional(),
+  /**
+   * The goal's prescribed rest between working sets. Computed on every
+   * check-in by `getParameters` and discarded — 240s for strength vs 75s for
+   * fat loss is one of the few places goal genuinely changes the session, and
+   * no tester could see it.
+   *
+   * NOT a countdown. The timer was removed 2026-09-29 on the founder's
+   * instruction — "you do not know if in the gym or other place only he is
+   * the one on the machine". This is a static line.
+   */
+  restSec: z.number().int().positive().max(600).optional(),
 });
 
 export type SessionScheduledPayload = z.infer<typeof SessionScheduledPayloadSchema>;

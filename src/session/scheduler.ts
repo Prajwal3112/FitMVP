@@ -76,6 +76,8 @@ export type ScheduledSessionDraft = {
   splitName: string;
   dayType: DayType;
   reasons: string[];
+  /** The goal's rest between working sets. Informational, never a timer. */
+  restSec: number;
 };
 
 /** Equipment people recognise, in the order a coach would reach for it. */
@@ -417,5 +419,6 @@ export function buildSessionDraft(input: ScheduleInput): ScheduledSessionDraft {
     splitName: split.name ?? '',
     dayType: effectiveDay,
     reasons: [split.why, ...resolved.reasons, ...extraReasons, ...(split.warning ? [split.warning] : [])],
+    restSec: params.restSec,
   };
 }

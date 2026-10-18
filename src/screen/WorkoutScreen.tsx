@@ -133,6 +133,40 @@ export default function WorkoutScreen({
   const [prepDone, setPrepDone] = useState<string[]>([]);
   const [coolDone, setCoolDone] = useState<string[]>([]);
   const warmup = session.warmup;
+
+  // ── How hard, and how long between sets ──
+  // targetRpe rode on every slot into the event log and no screen read it;
+  // restSec never left the scheduler. Both are session-wide, so this is one
+  // line, not a repeat on six cards.
+  //
+  // Printing "RPE 9" would repeat the mistake the ten-dot energy picker made:
+  // a number nobody was taught. RPE *is* reps-in-reserve, so say that.
+  // 10 = nothing left, 9 = one rep, 8 = two.
+  //
+  // The rest figure is NOT a countdown. The timer was removed 2026-09-29 on
+  // the founder's instruction — "you do not know if in the gym or other place
+  // only he is the one on the machine". It is a number you glance at.
+  const howToRun = React.useMemo(() => {
+    const rpe = exercises.find((e) => e.targetRpe !== undefined)?.targetRpe;
+    const parts: string[] = [];
+    if (rpe !== undefined) {
+      const rir = Math.round(10 - rpe);
+      parts.push(
+        rir <= 0
+          ? 'Push the hard sets to the point you cannot do another rep.'
+          : `Stop each set with about ${rir} rep${rir === 1 ? '' : 's'} left in you.`,
+      );
+    }
+    const rest = session.restSec;
+    if (rest !== null) {
+      parts.push(
+        rest >= 120
+          ? `Rest ${Math.round(rest / 60)}-${Math.round(rest / 60) + 1} minutes — heavy sets need it.`
+          : `Rest around ${rest} seconds between sets.`,
+      );
+    }
+    return parts.length > 0 ? parts.join(' ') : null;
+  }, [exercises, session.restSec]);
   const cooldown = session.cooldown;
 
   const handleDone = () => {
@@ -184,6 +218,12 @@ export default function WorkoutScreen({
         {!!session.openingNote && (
           <View style={styles.banner}>
             <Text style={styles.bannerText}>{session.openingNote}</Text>
+          </View>
+        )}
+
+        {howToRun !== null && (
+          <View style={styles.howTo}>
+            <Text style={styles.howToText}>{howToRun}</Text>
           </View>
         )}
 
@@ -467,6 +507,16 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     marginBottom: 20,
   },
+  howTo: {
+    marginTop: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.primary,
+    backgroundColor: colors.card,
+  },
+  howToText: { fontSize: 14, lineHeight: 20, color: colors.text },
   banner: {
     backgroundColor: colors.card,
     borderLeftWidth: 3,

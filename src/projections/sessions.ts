@@ -69,6 +69,11 @@ export type SessionState = {
   dropped: DroppedSlot[];
   /** Why today looks like this. `openingNote` is the one-line version. */
   reasons: string[];
+  /**
+   * The goal's rest between working sets, in seconds. Null for sessions
+   * scheduled before 2026-10-18. Informational — there is no timer.
+   */
+  restSec: number | null;
 };
 
 // ─── Projection state ────────────────────────────────────────────────
@@ -142,6 +147,7 @@ export function applySessionEvent(
         cooldown: p.cooldown ?? [],
         dropped: p.dropped ?? [],
         reasons: p.reasons ?? [],
+        restSec: p.restSec ?? null,
       };
       return {
         byId: { ...state.byId, [p.sessionId]: session },
@@ -184,6 +190,7 @@ export function applySessionEvent(
           cooldown: [],
           dropped: [],
           reasons: [],
+          restSec: null,
         };
         return {
           ...state,
@@ -321,6 +328,7 @@ export function applySessionEvent(
           cooldown: [],
           dropped: [],
           reasons: [],
+          restSec: null,
         };
         return {
           byId: { ...state.byId, [p.sessionId]: stub },
