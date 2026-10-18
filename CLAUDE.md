@@ -218,6 +218,94 @@ and `src/session/plausibility.ts`.
   `progression_advances`, `reentry_rhythm`, `logging_guards`, `backup`,
   `upcast`, `fold_cost`, `soreness_never_empties`.
 
+## ⚠ READ THIS ONE — ship list, verified 2026-10-18
+
+Every line below was checked against the code, not against a checkbox. The
+older lists further down this file contain stale `[ ]` boxes for work that is
+done; **this section supersedes them.**
+
+### BLOCKERS — a tester hits these and it costs you the test
+- [ ] **B1. The session is not back-locked.** `Workout` has
+      `options={{ title: '' }}` and no `BackHandler`, so the Android back
+      gesture silently exits a live session. The founder asked for this
+      explicitly on 2026-10-02: *"from that point to the complete end of a
+      session the app should not get out… if I try to go back it should ask me
+      whether you want to abandon this complete session or skip this entire
+      schedule for today."* Losing a logged workout to a stray swipe is the
+      worst thing a tester can experience. (`Review` IS locked; the session
+      is not — I locked the wrong screen.)
+- [ ] **B2. The report cannot segment pain by client.** This is the POINT of
+      the test and it is half-wired. `PreCheckinRecorded.notes` is collected
+      and never reported — *"slept badly, shoulder feels off, short on time"*,
+      prime free text, invisible. The **goal and the `why` never reach the
+      report at all**, so a complaint cannot be attributed to a goal. And the
+      report prints only experience / daysPerWeek / where — no bodyweight,
+      injuries, session length, schedule. Validation gate: feed it a synthetic
+      cohort and assert every free-text channel and profile field appears.
+- [ ] **B3. The energy scale is confusing AND fake.** Ten dots, no
+      explanation, and measured: only `<=3` vs `>3` changes anything, so
+      **seven of the ten do nothing**. `feel: 'good'` is a no-op in all 30
+      goal x experience combinations because `min(params.maxRpe,
+      resolved.maxRpe)` always returns params. Either make 'good' mean
+      something or ship three buttons — Phase 3.4 already said three buckets.
+
+### STRONGLY RECOMMENDED — the founder asked for each of these on device
+- [ ] **S1. Steppers, not keyboards**, for weight and reps. The single
+      most-used interaction in the app, with sweaty hands and one free hand.
+      Prefill already means one tap to accept; this is for the times it is
+      wrong.
+- [ ] **S2. Resume must show where you were.** It restores logged sets but
+      says only "N/M exercises" — nothing about what is next.
+- [ ] **S3. Mid-session swap, slot-constrained.** *"The machine is taken"* is
+      the commonest real-gym event and there is no path.
+      `findSubstitutesTiered` exists, is tested, has zero consumers.
+- [ ] **S4. When is my next session.** Nothing says it. Needs the schedule
+      question (which days / what time), then Home can say "Next: Thursday"
+      and a rest day can read as a rest day instead of an unstarted workout.
+- [ ] **S5. Render `targetRpe` and `params.restSec`** — the last two NO-PIXEL
+      items. The rest timer is hardcoded to 150s for everyone while
+      `getParameters` computes 75s for fat loss and 240s for strength.
+- [ ] **S6. Phase the onboarding.** Still nine sections on one scroll, and the
+      keyboard covers the field being typed into. Now also the longest screen
+      in the app, since declared lifts were added to it.
+
+### ACCEPTED LIMITS — tell the testers, do not fix before the test
+- **No kill switch.** `expo-updates` is not installed, so a bad build cannot
+  be fixed remotely — you hand-send a new APK and hope they install it.
+- **No notifications.** `expo-notifications` is not a dependency, so the app
+  cannot reach anyone who stops opening it. Out-of-app contact is
+  structurally impossible; text them yourself. Given the thesis is about the
+  lapse, doing that deliberately is also the cheapest test of it.
+- **Clock and timezone movement.** `trainingDayOf` uses local calendar
+  fields, so flying west produces *"Today's session is already complete"*
+  with no override. Rare; real.
+- **No iOS.** TestFlight needs a paid Apple Developer account.
+- **The export is not a restore.** `parseBackup` validates a file completely
+  but nothing writes it back — merging two event-sourced histories needs
+  conflict rules this project has not specified. It protects against losing
+  the PHONE, not against a corrupted log on a phone you still hold.
+
+### HOUSEKEEPING — no user impact
+- [ ] `getTodaysWorkout` + the six hardcoded templates in
+      `src/constants/workouts.ts` are dead; only a comment references them.
+      `Equipment` and `motivationalMessages` are the live exports — move them
+      and delete the rest.
+- [ ] Three event types (`GoalRevised`, `SessionResumed`,
+      `ExerciseSubstituted`) have full schemas, reducers and union membership
+      and **no code path can emit them**. `S3` would give
+      `ExerciseSubstituted` its first caller.
+
+### DONE since the older lists were written — do not re-do these
+Warm-up / cool-down / `dropped` / `reasons[1..]` rendered · the suggest-not-
+enforce change (extra sets, remove a set) · the history screen and
+`selectWhatWorks` · the dark gym-legible theme with a contrast check · block
+rotation (12 exercises/year → 23) · 89 bundled demonstration photos ·
+nutrition targets · declared lifts · `returning` treated as intermediate ·
+responsive layout across 280-1032dp · the hash chain · the upcaster registry ·
+`readEvents` skip-and-count · the restorable backup and `allowBackup: false` ·
+the mandatory session review · the unlock gate · onboarding passable at all ·
+everything committed.
+
 ### Still open before/during the test
 
 Ranked by what a tester actually hits.
