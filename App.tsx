@@ -7,7 +7,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { StatusBar } from 'expo-status-bar';
 import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
 import { eventCount, getLastEvent, verifyChain, enterReadOnlyMode } from './src/events/log';
-import { APP_BUILD } from './src/constants/build';
+import { releaseDetail } from './src/constants/release';
 
 import OnboardingScreen from './src/screen/OnboardingScreen';
 import HomeScreen from './src/screen/HomeScreen';
@@ -81,7 +81,7 @@ export default function App(): React.ReactElement {
         </Text>
         <TouchableOpacity
           onPress={() => {
-            void Share.share({ message: `FitMVP migration failure\nbuild ${APP_BUILD}\n${error.message}` })
+            void Share.share({ message: `FitMVP migration failure\n${releaseDetail()}\n${error.message}` })
               .catch(() => { /* dismissed */ });
           }}
           activeOpacity={0.7}
@@ -114,7 +114,7 @@ export default function App(): React.ReactElement {
         <TouchableOpacity
           onPress={() => {
             void Share.share({
-              message: `FitMVP integrity failure\nbuild ${APP_BUILD}\nbroken at seq ${integrity.brokenAtSeq}\nreason: ${integrity.reason}`,
+              message: `FitMVP integrity failure\n${releaseDetail()}\nbroken at seq ${integrity.brokenAtSeq}\nreason: ${integrity.reason}`,
             }).catch(() => { /* dismissed */ });
           }}
           activeOpacity={0.7}

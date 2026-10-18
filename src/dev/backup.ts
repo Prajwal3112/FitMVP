@@ -32,13 +32,19 @@ export const BackupSchema = z.object({
 });
 export type Backup = z.infer<typeof BackupSchema>;
 
-/** Serialise the log. `events` must be in seq order. */
-export function serializeLog(events: Event[]): string {
+/**
+ * Serialise the log. `events` must be in seq order.
+ *
+ * `app` is a parameter rather than a direct `APP_BUILD` read so the RN caller
+ * can stamp the OTA revision (see constants/release.ts) while this module
+ * stays free of native imports — `checks/backup.ts` loads it under tsx.
+ */
+export function serializeLog(events: Event[], app: string = APP_BUILD): string {
   let head = GENESIS_PREV_HASH;
   for (const e of events) head = hashEvent(e);
   const backup: Backup = {
     format: BACKUP_FORMAT,
-    app: APP_BUILD,
+    app,
     exportedAt: new Date().toISOString(),
     eventCount: events.length,
     finalHash: head,

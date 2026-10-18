@@ -77,7 +77,7 @@ import {
   proposeSwaps, type SwapReason, type SwapOptions,
 } from '../session/swap';
 import { selectWhatWorks, selectWhatWorksGap, type Insight } from '../projections/whatWorks';
-import { APP_BUILD } from '../constants/build';
+import { buildStamp } from '../constants/release';
 import {
   selectContextCompleteness,
   weeklyReveal,
@@ -808,7 +808,7 @@ export const FitnessProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   const exportDigest = useCallback(
     () => buildDigest(
-      sessions, contextState, userContext, APP_BUILD, logHealth.detail, goalProjection,
+      sessions, contextState, userContext, buildStamp(), logHealth.detail, goalProjection,
     ),
     [sessions, contextState, userContext, logHealth],
   );

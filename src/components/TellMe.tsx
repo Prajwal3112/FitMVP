@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Text, TouchableOpacity, StyleSheet, Share, Alert, View } from 'react-native';
 import { colors } from '../constants/colors';
-import { APP_BUILD } from '../constants/build';
+import { buildStamp, releaseDetail } from '../constants/release';
 
 /**
  * A way out for a tester who is stuck.
@@ -30,7 +30,7 @@ export function TellMe({
   const send = () => {
     const body = [
       `FitMVP — stuck on: ${where}`,
-      `build ${APP_BUILD}`,
+      releaseDetail(),
       `time ${new Date().toISOString()}`,
       '',
       detail ? detail() : '',
@@ -43,7 +43,7 @@ export function TellMe({
       .catch(() => {
         Alert.alert(
           'Could not open sharing',
-          `Screenshot this screen and send it instead. You were on: ${where} (build ${APP_BUILD}).`,
+          `Screenshot this screen and send it instead. You were on: ${where} (build ${buildStamp()}).`,
         );
       });
   };

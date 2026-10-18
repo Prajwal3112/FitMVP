@@ -2,7 +2,7 @@ import { File, Paths } from 'expo-file-system';
 import { isAvailableAsync, shareAsync } from 'expo-sharing';
 import { serializeLog } from './backup';
 import { readEvents } from '../events/log';
-import { APP_BUILD } from '../constants/build';
+import { buildStamp } from '../constants/release';
 
 /**
  * Hand the user a restorable copy of their event log.
@@ -40,7 +40,7 @@ export async function exportLogToFile(): Promise<ExportResult> {
   try {
     const events = await readEvents();
     count = events.length;
-    json = serializeLog(events);
+    json = serializeLog(events, buildStamp());
   } catch (e) {
     return {
       ok: false,
@@ -67,7 +67,7 @@ export async function exportLogToFile(): Promise<ExportResult> {
     if (await isAvailableAsync()) {
       await shareAsync(file.uri, {
         mimeType: 'application/json',
-        dialogTitle: `FitMVP backup · ${count} events · build ${APP_BUILD}`,
+        dialogTitle: `FitMVP backup · ${count} events · build ${buildStamp()}`,
         UTI: 'public.json',
       });
       shared = true;

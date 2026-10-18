@@ -270,8 +270,10 @@ done; **this section supersedes them.**
       in the app, since declared lifts were added to it.
 
 ### ACCEPTED LIMITS — tell the testers, do not fix before the test
-- **No kill switch.** `expo-updates` is not installed, so a bad build cannot
-  be fixed remotely — you hand-send a new APK and hope they install it.
+- ~~**No kill switch.**~~ **FIXED 2026-10-18.** `expo-updates ~29.0.20`
+  (zero transitive deps) + `channel: preview` in `eas.json`. Testers install
+  the APK **once**; every later JS or asset change reaches them silently on
+  next open. A native dependency still needs a fresh APK.
 - **No notifications.** `expo-notifications` is not a dependency, so the app
   cannot reach anyone who stops opening it. Out-of-app contact is
   structurally impossible; text them yourself. Given the thesis is about the
@@ -347,9 +349,9 @@ Ranked by what a tester actually hits.
     (`GoalRevised`, `SessionResumed`, `ExerciseSubstituted`) with full schemas,
     reducers and union membership that **no code path can emit**.
 11. **36 files uncommitted.** Every line of the last two weeks is untagged.
-12. **No kill switch.** `eas.json` declares a `preview` channel but
-    `expo-updates` is not installed, so it does nothing. If a build bricks a
-    tester you hand-send a new APK and hope they install it.
+12. ~~**No kill switch.**~~ **FIXED 2026-10-18** — and the claim was wrong
+    twice over: `eas.json` did not declare a channel at all, so there was
+    nothing for `expo-updates` to be missing from. Both are present now.
 13. `getTodaysWorkout` in `src/constants/workouts.ts` is dead and still
     contains a `throw` inside render. `Equipment` and `motivationalMessages`
     are its only live exports; move them and delete the rest.
@@ -585,7 +587,7 @@ health it cannot see.
 ## Ready to hand out — build `0.3.0-gym`, versionCode 4 (2026-10-18)
 
 Every item on the device-test ship list is closed. `npm run check` is
-**39 suites, 0 failures**; `tsc --noEmit` exit 0. What shipped in this pass,
+**40 suites, 0 failures**; `tsc --noEmit` exit 0. What shipped in this pass,
 shortest to longest: the session is no longer exitable by accident · three
 labelled feel buttons that genuinely change the session · `targetRpe` and
 `restSec` reach a screen in words, so the pixel test is **0 of 6 unrendered,
@@ -618,16 +620,61 @@ multi-week unattended test. Use a standalone APK.
 - `src/constants/build.ts` — `APP_BUILD`, shown on Home and stamped on every
   error report
 
-### Per build
+### Per change — OTA, which is almost always the right one
+`expo-updates` is installed and the `preview` profile has `channel: preview`,
+so a JavaScript or asset change does **not** need a new APK:
+
+1. `npm run check` → expect 40 passed, 0 failed.
+2. `eas update --channel preview -m "what changed"`
+3. Nothing to send. Each tester picks it up on their next app open.
+
+`fallbackToCacheTimeout: 0` means the app launches from its cached bundle and
+fetches in the background, so a bad publish only takes effect on the *next*
+launch — never the one that downloads it. That is what keeps it rollback-able
+(`eas update:rollback`) instead of bricking six phones.
+
+`runtimeVersion` is `{"policy": "fingerprint"}`, NOT `appVersion`: it hashes
+the native project, so a JS change stays compatible while **adding a native
+dependency automatically makes existing APKs ineligible** rather than handing
+them a bundle that calls methods they do not have.
+
+### Per APK — only when the native project changes
+A new dependency (`expo-notifications`, say), an `app.json` native key, or an
+SDK bump:
+
 1. Bump **both** `app.json → expo.android.versionCode` (integer, +1) and
-   `src/constants/build.ts → APP_BUILD`. Android refuses to install an APK
-   whose `versionCode` is not higher than the installed one; and a bug report
-   without a build string cannot be placed against a commit.
-2. `npx tsc --noEmit` → expect exit 0.
+   `src/constants/build.ts → APP_BUILD`. Android refuses an APK whose
+   `versionCode` is not higher than the installed one; and a report without a
+   build string cannot be placed against a commit. `checks/release.ts` asserts
+   both exist, though it cannot know you forgot to increment them.
+2. `npm run check` → expect exit 0.
 3. `eas build -p android --profile preview` (needs `eas-cli` and an Expo
    account; the first run asks about a keystore — let EAS manage it, and do
    not change it later or updates stop installing over the old app).
 4. EAS returns an install link. Send that link.
+
+**`APP_BUILD` alone no longer identifies what someone is running** — the APK
+keeps one string across every OTA revision. `buildStamp()` and
+`releaseDetail()` in `src/constants/release.ts` append the running update id,
+the channel and its publish time, and all five reporting sites use them.
+`constants/build.ts` and `src/dev/backup.ts` deliberately stay free of native
+imports, because `checks/backup.ts` loads them under tsx.
+
+### Why the link goes over WhatsApp and not Firebase or Play (decided 2026-10-18)
+Firebase App Distribution and Play Internal Testing both earn their keep by
+managing **repeated** installs — who is on which build, pushing updates. OTA
+removes that problem: the link is used once, ever, and everyone converges on
+the same JS bundle automatically. Paying $25 plus identity verification, or
+wiring a google-services config, to manage a one-time event is setup for
+nothing. Firebase's in-app feedback would also duplicate `TellMe`, which
+already sits on Onboarding, Goal and Review and stamps the screen and build.
+
+Feedback therefore rides the OS share sheet into one WhatsApp group: the
+digest as pasteable text (~9 KB for four weeks), the backup as a file
+attachment. Save the backups into one folder and run
+`npm run review-report <folder>`. **The one manual step is asking** — there
+are no notifications, so a weekly "send me your data" message is the prompt.
+Doing that by hand is also the cheapest available test of the lapse thesis.
 
 ### What a tester does
 - Open the link on the phone, allow install-from-unknown-source once, install.
@@ -1421,11 +1468,11 @@ Then wait.
 ```bash
 cd FitMVP
 npm install
-npm run check       # tsc --noEmit && ./checks/run.sh — expect: 28 passed, 0 failed
+npm run check       # tsc --noEmit && ./checks/run.sh — expect: 40 passed, 0 failed
 ```
 
-`npm run check` is the gate. It needs no test runner — `tsx` arrives as a
-drizzle-kit transitive dep. What it does NOT cover: anything that renders. The
+`npm run check` is the gate (**40 suites**). It needs no test runner — `tsx`
+arrives as a drizzle-kit transitive dep. What it does NOT cover: anything that renders. The
 suites exercise pure logic and the form/validation seams; they cannot catch a
 layout bug, and they only caught the onboarding dead end once the validation
 was moved out of the React module.

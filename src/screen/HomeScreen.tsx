@@ -12,7 +12,7 @@ import { ProgressBar } from '../components/ProgressBar';
 import { ReturnHome } from '../components/ReturnHome';
 import { ContextCard } from '../components/ContextCard';
 import { useFitness, type GoalType } from '../context/FitnessContext';
-import { APP_BUILD } from '../constants/build';
+import { buildStamp } from '../constants/release';
 import type { RootStackScreenProps } from '../navigation/types';
 
 const GOAL_LABELS: Record<GoalType, string> = {
@@ -375,7 +375,7 @@ export default function HomeScreen({
         <TouchableOpacity onPress={handleShare} activeOpacity={0.6} style={styles.shareRowTight}>
           <Text style={styles.shareText}>Send my training data to Prajwal</Text>
         </TouchableOpacity>
-        <Text style={styles.build}>{APP_BUILD}</Text>
+        <Text style={styles.build}>{buildStamp()}</Text>
       </ScrollView>
     </SafeAreaView>
   );
