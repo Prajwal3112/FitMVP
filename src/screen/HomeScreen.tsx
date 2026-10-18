@@ -3,6 +3,7 @@ import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity, Share, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { selectSessionProgress } from '../projections/sessions';
 import { colors } from '../constants/colors';
 import { DROP_REASON } from '../constants/copy';
 import { typography } from '../constants/typography';
@@ -71,10 +72,27 @@ export default function HomeScreen({
     ? Math.min(adherence.completed / adherence.expected, 1)
     : 0;
 
+  // ── What "Resume" resumes ──
+  // It used to say "Resume Workout" and nothing else, so walking away
+  // mid-session and coming back gave no sign the sets had been kept. They
+  // always were — the log is append-only — but nothing on screen said so.
+  const progress = todaysSession !== null && status === 'active'
+    ? selectSessionProgress(todaysSession)
+    : null;
+  const resumeLine =
+    progress === null || progress.setsLogged === 0
+      ? null
+      : progress.nextExerciseName !== null
+        ? `${progress.setsLogged} set${progress.setsLogged === 1 ? '' : 's'} logged · ` +
+          `${progress.exercisesDone} of ${progress.exercisesTotal} exercises · ` +
+          `next up ${progress.nextExerciseName}`
+        : `${progress.setsLogged} sets logged · every exercise started`;
+
   const ctaTitle =
     isDone ? 'Done for today' :
     isSkipped ? 'Skipped today' :
-    inProgress ? 'Resume Workout' :
+    progress !== null && progress.setsLogged > 0 ? 'Pick up where you left off' :
+    inProgress ? 'Start Workout' :
     'Start Workout';
 
   // Testers are not going to write bug reports. This gives them one tap to
@@ -235,6 +253,9 @@ export default function HomeScreen({
                     Day {currentDay} · ~{estimatedMinutes + warmupMinutes} min · {exerciseCount} exercises
                     {splitName !== null ? ` · ${splitName}` : ''}
                   </Text>
+                  {resumeLine !== null && (
+                    <Text style={styles.resumeLine}>{resumeLine}</Text>
+                  )}
                 </>
               ) : (
                 <>
@@ -405,6 +426,7 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
   cellSubPlain: { fontSize: 14, color: colors.textMuted, marginTop: 4 },
+  resumeLine: { fontSize: 13, color: colors.primary, marginTop: 6, lineHeight: 18 },
   summaryCell: { padding: 16 },
   summaryText: { fontSize: 15, color: colors.text, lineHeight: 21 },
   chevron: { fontSize: 20, color: colors.textTertiary, marginLeft: 8 },

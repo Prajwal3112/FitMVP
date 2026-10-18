@@ -11,6 +11,14 @@ import { exerciseName } from '../data/exercises';
 // meaningful rating on a working set.
 const RPE_CHOICES = [6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10] as const;
 
+/**
+ * The stepper increment. 2.5kg is the smallest you can actually load on a
+ * barbell (a pair of 1.25s) and the standard dumbbell jump — the same figure
+ * as MIN_LOADABLE_STEP_KG in session/progression.ts, which exists for the
+ * same physical reason.
+ */
+const WEIGHT_STEP_KG = 2.5;
+
 export type LogSetArgs = {
   setIndex: number;
   isWarmup?: boolean;
@@ -97,6 +105,16 @@ export const ExerciseLogCard: React.FC<ExerciseLogCardProps> = ({
     0,
   );
 
+  // ── The row you are about to fill ──
+  // Only this one gets the stepper strip. Steppers on every row would be
+  // eighteen more targets, and the rows above are history you are not editing.
+  const nextKey = (() => {
+    const doneSet = new Set(loggedSets.map((x) => `${x.isWarmup ? 'w' : 's'}${x.setIndex}`));
+    for (let i = 0; i < warmupRows; i++) if (!doneSet.has(`w${i}`)) return `w${i}`;
+    for (let i = 0; i < workingRows; i++) if (!doneSet.has(`s${i}`)) return `s${i}`;
+    return null;
+  })();
+
   const keyOf = (setIndex: number, isWarmup: boolean) =>
     `${isWarmup ? 'w' : 's'}${setIndex}`;
 
@@ -129,6 +147,20 @@ export const ExerciseLogCard: React.FC<ExerciseLogCardProps> = ({
 
   const setDraft = (key: string, patch: Partial<RowDraft>) =>
     setDrafts((prev) => ({ ...prev, [key]: { ...draftFor(key), ...patch } }));
+
+  /**
+   * Nudge a field by `delta`, clamped at zero. Starts from the prefill when
+   * the field is empty, so "+2.5" on a blank row means "a bit more than last
+   * time" rather than "2.5kg".
+   */
+  const bump = (key: string, field: keyof RowDraft, delta: number) => {
+    const current = Number(draftFor(key)[field]);
+    const from = Number.isFinite(current) ? current : 0;
+    const next = Math.max(0, from + delta);
+    // Weight keeps a half-step; reps are whole.
+    const text = field === 'reps' ? String(Math.round(next)) : String(Math.round(next * 2) / 2);
+    setDraft(key, { [field]: text });
+  };
 
   const logged = (setIndex: number, isWarmup: boolean) =>
     loggedSets.find((s) => s.setIndex === setIndex && s.isWarmup === isWarmup);
@@ -252,6 +284,33 @@ export const ExerciseLogCard: React.FC<ExerciseLogCardProps> = ({
             </Text>
           </TouchableOpacity>
         </View>
+
+        {/* STEPPERS, so the keyboard is the exception and not the rule.
+            Prefill already means the common case is one tap on ✓, but the
+            moment a number differs you got a numeric keyboard over the rows
+            you were reading. 2.5kg is the smallest increment you can actually
+            load on a bar (a pair of 1.25s) — see MIN_LOADABLE_STEP_KG. The
+            text fields stay, for anything these two cannot reach. */}
+        {key === nextKey && !done && (
+          <View style={styles.stepRow}>
+            {([
+              ['−2.5', () => bump(key, 'weight', -WEIGHT_STEP_KG)],
+              ['+2.5', () => bump(key, 'weight', WEIGHT_STEP_KG)],
+            ] as const).map(([label, fn]) => (
+              <TouchableOpacity key={label} style={styles.step} onPress={fn} activeOpacity={0.6}>
+                <Text style={styles.stepText}>{label}<Text style={styles.stepUnit}> kg</Text></Text>
+              </TouchableOpacity>
+            ))}
+            {!isHold && ([
+              ['−1', () => bump(key, 'reps', -1)],
+              ['+1', () => bump(key, 'reps', 1)],
+            ] as const).map(([label, fn]) => (
+              <TouchableOpacity key={label} style={styles.step} onPress={fn} activeOpacity={0.6}>
+                <Text style={styles.stepText}>{label}<Text style={styles.stepUnit}> rep</Text></Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
         {rpeOpen && (
           <View style={styles.rpeStrip}>
@@ -419,6 +478,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     textAlign: 'center',
   },
+  stepRow: { flexDirection: 'row', gap: 6, paddingLeft: 42, paddingTop: 2, paddingBottom: 6 },
+  step: {
+    flex: 1, minHeight: 44, borderRadius: 8, alignItems: 'center',
+    justifyContent: 'center', backgroundColor: colors.raised,
+  },
+  stepText: { fontSize: 15, fontWeight: '600', color: colors.text },
+  stepUnit: { fontSize: 11, fontWeight: '500', color: colors.textMuted },
   numCell: { minWidth: 62 },
   repCell: { minWidth: 48 },
   unit: { fontSize: 12, color: colors.textMuted, marginLeft: 3 },

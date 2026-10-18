@@ -378,6 +378,38 @@ export function selectSessionForDay(
 }
 
 /**
+ * Where you got to in a session you walked away from.
+ *
+ * "Resume Workout" said nothing about progress, so leaving mid-session and
+ * coming back an hour later gave no sign the app had kept anything — which
+ * reads as having lost the sets you logged. Exists so Home can say "you were
+ * on Barbell Row, 7 sets in".
+ *
+ * Warm-ups deliberately do not count: set identity is
+ * (exerciseId, isWarmup, setIndex) and a warm-up has never counted toward
+ * prescribed volume, "exercises completed" or the §8.3 one-set guard.
+ */
+export type SessionProgress = {
+  exercisesDone: number;
+  exercisesTotal: number;
+  setsLogged: number;
+  /** The first exercise with no working set yet, skipped ones passed over. */
+  nextExerciseName: string | null;
+};
+
+export function selectSessionProgress(s: SessionState): SessionProgress {
+  const working = workingSets(s.setLog);
+  const withSets = new Set(working.map((x) => x.exerciseId));
+  const live = s.exercises.filter((e) => !s.skippedExerciseIds.includes(e.exerciseId));
+  return {
+    exercisesDone: live.filter((e) => withSets.has(e.exerciseId)).length,
+    exercisesTotal: live.length,
+    setsLogged: working.length,
+    nextExerciseName: live.find((e) => !withSets.has(e.exerciseId))?.name ?? null,
+  };
+}
+
+/**
  * Sessions been through, completed or skipped. Drives the "Day N" label.
  */
 export function selectSessionIndex(p: SessionsProjection): number {
