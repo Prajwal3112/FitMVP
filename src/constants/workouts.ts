@@ -1,104 +1,20 @@
-// ─── Types ─────────────────────────────────────────────────────
+// ─── What's left of the template era ───────────────────────────
+//
+// This file used to hold three hand-written workouts per equipment tier and
+// `getTodaysWorkout(equipment, day % 3)`, which was the app's entire idea of
+// a programme. Everything a session is made of now comes from the engine —
+// selectSplit → resolveSession → getParameters → 743 exercises filled into
+// movement-pattern slots — and HomeScreen was the templates' last consumer.
+//
+// Deleted 2026-10-18: HOME_WORKOUTS, GYM_WORKOUTS, `workouts`, `Workout`,
+// `Exercise` and `getTodaysWorkout`. The last of those shipped in the
+// production bundle with a `throw` on its unreachable branch, inside a
+// function called during render.
+//
+// `Equipment` stays because fourteen modules import it, and the copy below
+// stays because two screens show it.
 
 export type Equipment = 'home' | 'gym';
-
-export type Exercise = {
-  name: string;
-  sets: number;
-  reps?: number;
-  duration?: string;
-};
-
-export type Workout = {
-  id: string;
-  name: string;
-  exercises: Exercise[];
-};
-
-// ─── Workout Templates (A · B · C) ──────────────────────────────
-
-const HOME_WORKOUTS: Workout[] = [
-  {
-    id: 'home-a',
-    name: 'Push Focus',
-    exercises: [
-      { name: 'Push-Ups',         sets: 3, reps: 12 },
-      { name: 'Pike Push-Ups',    sets: 3, reps: 10 },
-      { name: 'Diamond Push-Ups', sets: 3, reps: 8 },
-      { name: 'Plank Hold',       sets: 3, duration: '30 sec' },
-    ],
-  },
-  {
-    id: 'home-b',
-    name: 'Legs & Core',
-    exercises: [
-      { name: 'Bodyweight Squats', sets: 3, reps: 15 },
-      { name: 'Reverse Lunges',    sets: 3, reps: 12 },
-      { name: 'Glute Bridges',     sets: 3, reps: 15 },
-      { name: 'Mountain Climbers', sets: 3, reps: 20 },
-    ],
-  },
-  {
-    id: 'home-c',
-    name: 'Full Body',
-    exercises: [
-      { name: 'Burpees',        sets: 3, reps: 10 },
-      { name: 'Squat to Press', sets: 3, reps: 12 },
-      { name: 'Jumping Jacks',  sets: 3, reps: 25 },
-      { name: 'Dead Bug',       sets: 3, reps: 10 },
-    ],
-  },
-];
-
-const GYM_WORKOUTS: Workout[] = [
-  {
-    id: 'gym-a',
-    name: 'Push Day',
-    exercises: [
-      { name: 'Bench Press',            sets: 4, reps: 8 },
-      { name: 'Overhead Press',         sets: 3, reps: 10 },
-      { name: 'Incline Dumbbell Press', sets: 3, reps: 10 },
-      { name: 'Tricep Pushdown',        sets: 3, reps: 12 },
-    ],
-  },
-  {
-    id: 'gym-b',
-    name: 'Pull Day',
-    exercises: [
-      { name: 'Deadlift',     sets: 3, reps: 6 },
-      { name: 'Lat Pulldown', sets: 3, reps: 12 },
-      { name: 'Cable Row',    sets: 3, reps: 12 },
-      { name: 'Bicep Curl',   sets: 3, reps: 12 },
-    ],
-  },
-  {
-    id: 'gym-c',
-    name: 'Leg Day',
-    exercises: [
-      { name: 'Barbell Squat',     sets: 4, reps: 8 },
-      { name: 'Leg Press',         sets: 3, reps: 12 },
-      { name: 'Romanian Deadlift', sets: 3, reps: 10 },
-      { name: 'Leg Curl',          sets: 3, reps: 12 },
-    ],
-  },
-];
-
-// ─── Equipment filter ──────────────────────────────────────────
-
-export const workouts: Record<Equipment, Workout[]> = {
-  home: HOME_WORKOUTS,
-  gym: GYM_WORKOUTS,
-};
-
-// ─── Rotation selector ─────────────────────────────────────────
-// Day 1 → A · Day 2 → B · Day 3 → C · Day 4 → A · …
-
-export const getTodaysWorkout = (equipment: Equipment, currentDay: number): Workout => {
-  const list = workouts[equipment] ?? workouts.home;
-  const workout = list[(currentDay - 1) % list.length];
-  if (!workout) throw new Error('workout rotation produced undefined — empty list?');
-  return workout;
-};
 
 // ─── Motivational copy ─────────────────────────────────────────
 

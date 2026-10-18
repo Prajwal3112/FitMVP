@@ -33,8 +33,9 @@ const KNOWN_ORPHANS = new Set([
   'findSubstitutes', 'findNonSoreAlternatives',
   'successFraming', 'progressionStyle', 'goalFeasibility', 'progressionMode',
   'isCalibrationSession', 'lastPerformance', 'exerciseIdOf',
-  'draftGoalRevised', 'draftSessionResumed',
-  'getTodaysWorkout', 'workouts', 'Workout',
+  // draftGoalRevised wired 2026-10-18. draftSessionResumed belongs to Step 7b,
+  // which is deliberately cut from v1 — so it stays here on purpose.
+  'draftSessionResumed',
   'isReadOnly', 'unreadableEventDetail',
   'parseBackup', 'describeBackup',                   // restore not implemented — see exportFile.ts
   'MAX_PLAUSIBLE_REPS', 'MAX_PLAUSIBLE_DURATION_SEC', 'MAX_PLAUSIBLE_WEIGHT_KG',

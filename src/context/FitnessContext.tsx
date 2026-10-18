@@ -16,7 +16,7 @@ import {
   draftUserContextCreated, draftUserContextUpdated,
   type Experience, type OwnedEquipment,
 } from '../events/userContext';
-import { draftGoalCreated, type GoalKind } from '../events/goal';
+import { draftGoalCreated, draftGoalRevised, type GoalKind } from '../events/goal';
 import {
   validateOnboardingForm, formToOnboardingPayload, emptyOnboardingForm,
   type OnboardingForm,
@@ -295,6 +295,9 @@ export const FitnessProvider: React.FC<{ children: ReactNode }> = ({ children })
   // Commands need the projection as of *now*, not as of last render.
   // Appends happen in sequence, so a ref is the honest read.
   const sessionsRef = useRef<SessionsProjection>(INITIAL_SESSIONS);
+  // Same reason: submitGoal has to know whether a goal already exists at the
+  // moment it writes, not as of last render.
+  const goalRef = useRef<CurrentGoalProjection>(INITIAL_GOAL);
   // Adherence is computed below; the re-entry memo quotes last render's value
   // rather than creating a circular dependency between the two.
 
@@ -302,7 +305,9 @@ export const FitnessProvider: React.FC<{ children: ReactNode }> = ({ children })
     const nextSessions = buildSessionsProjection(events);
     sessionsRef.current = nextSessions;
     setUserContext(buildUserContextProjection(events));
-    setGoalProjection(buildGoalProjection(events));
+    const nextGoal = buildGoalProjection(events);
+    goalRef.current = nextGoal;
+    setGoalProjection(nextGoal);
     setSessions(nextSessions);
     setStreak(buildStreakProjection(events));
   }, []);
@@ -379,16 +384,56 @@ export const FitnessProvider: React.FC<{ children: ReactNode }> = ({ children })
     [refreshProjections],
   );
 
+  /**
+   * Set a goal, or REVISE the one that exists.
+   *
+   * It always appended `GoalCreated`, so a tester who changed their mind
+   * ended with two live goals in the log and `revisionCount` stuck at 0
+   * forever — `GoalRevised` had a schema, a reducer that increments the
+   * count, and no emitter anywhere, which is the same end-to-end-but-dead
+   * shape the mid-session swap had. The event exists to record that the goal
+   * MOVED; a second GoalCreated loses that, and "they changed their goal in
+   * week two" is exactly the kind of thing the test is for.
+   *
+   * One event per changed field, because that is the payload's shape
+   * (field/before/after) and it keeps the before-value truthful.
+   */
   const submitGoal = useCallback(
     async (goal: GoalType, why: string) => {
-      const draft = draftGoalCreated({
-        goalId: newEventId(),
-        goalType: UI_TO_GOAL_KIND[goal],
-        why: why.trim(),
-        targetDate: defaultTargetDate(),
-      });
-      await appendEvent(draft, { rolloverHour: userContext.dayRolloverHour });
-      await refreshProjections();
+      const goalType = UI_TO_GOAL_KIND[goal];
+      const trimmedWhy = why.trim();
+      const current = goalRef.current;
+
+      if (current.goalId === null) {
+        await appendEvent(
+          draftGoalCreated({
+            goalId: newEventId(),
+            goalType,
+            why: trimmedWhy,
+            targetDate: defaultTargetDate(),
+          }),
+          { rolloverHour: userContext.dayRolloverHour },
+        );
+        await refreshProjections();
+        return;
+      }
+
+      const changes: { field: 'goalType' | 'why'; before: unknown; after: unknown }[] = [];
+      if (current.goalType !== goalType) {
+        changes.push({ field: 'goalType', before: current.goalType, after: goalType });
+      }
+      if (current.why !== trimmedWhy) {
+        changes.push({ field: 'why', before: current.why, after: trimmedWhy });
+      }
+      // Tapping Save without changing anything writes nothing. The old
+      // version appended a duplicate goal every time.
+      for (const c of changes) {
+        await appendEvent(
+          draftGoalRevised({ goalId: current.goalId, ...c }),
+          { rolloverHour: userContext.dayRolloverHour },
+        );
+      }
+      if (changes.length > 0) await refreshProjections();
     },
     [refreshProjections, userContext.dayRolloverHour],
   );
