@@ -2,12 +2,14 @@
   "expo": {
     "name": "FitMVP",
     "slug": "FitMVP",
+    "owner": "elbmak",
     "version": "1.0.0",
     "runtimeVersion": {
       "policy": "fingerprint"
     },
     "updates": {
-      "fallbackToCacheTimeout": 0
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/90384a1f-1896-46d8-a83a-ee962cf28067"
     },
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -37,6 +39,11 @@
     },
     "plugins": [
       "expo-sqlite"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "90384a1f-1896-46d8-a83a-ee962cf28067"
+      }
+    }
   }
 }
