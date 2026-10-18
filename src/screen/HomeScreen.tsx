@@ -27,6 +27,7 @@ export default function HomeScreen({
   const {
     userData, todaysSession, currentDay, streak, adherence, reentry,
     preview, previewError, contextState, reveal, exportDigest, exportBackup, logHealth,
+    nextSession,
   } = useFitness();
   const goalSet = userData.goal !== null && userData.why.length > 0;
 
@@ -301,6 +302,20 @@ export default function HomeScreen({
           </>
         )}
 
+        {/* The dead end. "Done for today" with a disabled button and nothing
+            else said; the obvious next question had no answer anywhere. */}
+        {(isDone || isSkipped) && (
+          <>
+            <Text style={styles.section}>NEXT ONE</Text>
+            <View style={styles.group}>
+              <View style={styles.summaryCell}>
+                <Text style={styles.nextLabel}>{nextSession.label}</Text>
+                <Text style={styles.nextDetail}>{nextSession.detail}</Text>
+              </View>
+            </View>
+          </>
+        )}
+
         {isDone && !!todaysSession?.summary && (
           <>
             <Text style={styles.section}>TODAY'S SUMMARY</Text>
@@ -427,6 +442,8 @@ const styles = StyleSheet.create({
   },
   cellSubPlain: { fontSize: 14, color: colors.textMuted, marginTop: 4 },
   resumeLine: { fontSize: 13, color: colors.primary, marginTop: 6, lineHeight: 18 },
+  nextLabel: { fontSize: 19, fontWeight: '700', color: colors.text },
+  nextDetail: { fontSize: 14, color: colors.textMuted, marginTop: 6, lineHeight: 20 },
   summaryCell: { padding: 16 },
   summaryText: { fontSize: 15, color: colors.text, lineHeight: 21 },
   chevron: { fontSize: 20, color: colors.textTertiary, marginLeft: 8 },

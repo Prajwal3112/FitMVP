@@ -14,7 +14,10 @@ import type { RootStackScreenProps } from '../navigation/types';
 export default function CompletionScreen({
   navigation,
 }: RootStackScreenProps<'Completion'>): React.ReactElement {
-  const { userData, currentDay, streak, adherence, lastCompletedSession } = useFitness();
+  const {
+    userData, currentDay, streak, adherence, lastCompletedSession,
+    nextSession: next,
+  } = useFitness();
   const completedDay = currentDay - 1;
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -108,6 +111,14 @@ export default function CompletionScreen({
           </>
         )}
 
+        <Text style={styles.section}>NEXT ONE</Text>
+        <View style={styles.group}>
+          <View style={styles.whyCell}>
+            <Text style={styles.nextLabel}>{next.label}</Text>
+            <Text style={styles.nextDetail}>{next.detail}</Text>
+          </View>
+        </View>
+
         {!!userData.why && (
           <>
             <Text style={styles.section}>YOUR WHY</Text>
@@ -177,6 +188,8 @@ const styles = StyleSheet.create({
     maxWidth: 300,
     lineHeight: 21,
   },
+  nextLabel: { fontSize: 19, fontWeight: '700', color: colors.text },
+  nextDetail: { fontSize: 14, color: colors.textMuted, marginTop: 6, lineHeight: 20 },
   section: {
     ...typography.sectionHeader,
     marginTop: 24,

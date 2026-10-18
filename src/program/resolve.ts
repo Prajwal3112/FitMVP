@@ -57,8 +57,14 @@ export type Resolved = {
   overridden: boolean;
 };
 
-/** 36h is the practical floor between sessions hitting the same muscles. [C] */
-const RECOVERY_HOURS = 36;
+/**
+ * 36h is the practical floor between sessions hitting the same muscles. [C]
+ *
+ * Exported so "when can I train again" answers the same number the scheduler
+ * enforces. Two sources of truth for a recovery window would eventually tell
+ * someone to come back at a time the engine then refuses.
+ */
+export const RECOVERY_HOURS = 36;
 /** Past this, a muscle group is being starved and something is wrong. */
 const DRIFT_DAYS = 14;
 /** Below this many sessions, soreness everywhere is just being new. */

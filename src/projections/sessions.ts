@@ -410,6 +410,21 @@ export function selectSessionProgress(s: SessionState): SessionProgress {
 }
 
 /**
+ * When the last completed session actually finished, as a timestamp.
+ *
+ * `selectGap` already gives the last completed *training day*, which is a
+ * date string and loses the hour — and the recovery floor is measured in
+ * hours, so a training day cannot answer "when can I train again".
+ */
+export function selectLastCompletedAt(p: SessionsProjection): string | null {
+  for (let i = p.order.length - 1; i >= 0; i--) {
+    const s = p.byId[p.order[i]!];
+    if (s?.status === 'completed' && s.completedAt !== null) return s.completedAt;
+  }
+  return null;
+}
+
+/**
  * Sessions been through, completed or skipped. Drives the "Day N" label.
  */
 export function selectSessionIndex(p: SessionsProjection): number {

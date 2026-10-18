@@ -44,6 +44,7 @@ import {
   applySessionEvent,
   selectSessionForDay,
   selectSessionIndex,
+  selectLastCompletedAt,
   selectExerciseHistory,
   selectAdherenceWindow,
   selectGap,
@@ -65,6 +66,7 @@ import {
 } from '../projections/streak';
 import { suggestSession, type LoadSuggestion } from '../session/progression';
 import { reentryPolicy, scaleLoad, type ReentryPolicy } from '../session/reentry';
+import { selectNextSession, type NextSession } from '../session/nextSession';
 import { buildSessionDraft, type ScheduledSessionDraft } from '../session/scheduler';
 import { buildDigest } from '../dev/digest';
 import { exportLogToFile, type ExportResult } from '../dev/exportFile';
@@ -121,6 +123,8 @@ export type FitnessContextValue = {
   todaysSession: SessionState | null;
   /** The session just completed — survives navigation to Completion. */
   lastCompletedSession: SessionState | null;
+  /** When the next session can honestly be done. Never a promised date. */
+  nextSession: NextSession;
   /** 1-indexed day label. Derived from sessions completed + skipped. */
   currentDay: number;
   streak: StreakProjection;
@@ -590,6 +594,26 @@ export const FitnessProvider: React.FC<{ children: ReactNode }> = ({ children })
     [sessions, dayTick],
   );
 
+  /**
+   * "When can I do the next one?" — asked out loud after an hour on a real
+   * phone, with no answer anywhere in the app.
+   *
+   * Derived HERE rather than in the screens, keyed on `dayTick`, for the same
+   * reason every other date-derived value is: Android keeps RN apps alive for
+   * days, and a value computed from `new Date()` inside a screen's useMemo
+   * never invalidates at the 4am rollover. A tester already saw "Done for
+   * today" with a dead button from exactly that bug.
+   */
+  const lastCompletedAt = useMemo(() => selectLastCompletedAt(sessions), [sessions]);
+  const nextSession = useMemo(
+    () => selectNextSession(
+      lastCompletedAt, daysPerWeek, new Date(),
+    ),
+    // dayTick is the staleness guard, not an input to the computation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [lastCompletedAt, daysPerWeek, dayTick],
+  );
+
   const lastCompletedSession = useMemo(
     () => (lastCompletedId ? (sessions.byId[lastCompletedId] ?? null) : null),
     [sessions, lastCompletedId],
@@ -761,6 +785,7 @@ export const FitnessProvider: React.FC<{ children: ReactNode }> = ({ children })
       isHydrated,
       todaysSession,
       lastCompletedSession,
+      nextSession,
       currentDay,
       streak,
       adherencePct,
@@ -812,6 +837,7 @@ export const FitnessProvider: React.FC<{ children: ReactNode }> = ({ children })
       isHydrated,
       todaysSession,
       lastCompletedSession,
+      nextSession,
       currentDay,
       streak,
       adherencePct,
