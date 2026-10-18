@@ -762,7 +762,9 @@ export const FitnessProvider: React.FC<{ children: ReactNode }> = ({ children })
   const exportBackup = useCallback(() => exportLogToFile(), []);
 
   const exportDigest = useCallback(
-    () => buildDigest(sessions, contextState, userContext, APP_BUILD, logHealth.detail),
+    () => buildDigest(
+      sessions, contextState, userContext, APP_BUILD, logHealth.detail, goalProjection,
+    ),
     [sessions, contextState, userContext, logHealth],
   );
 

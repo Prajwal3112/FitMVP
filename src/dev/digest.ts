@@ -1,20 +1,28 @@
 import type { SessionsProjection } from '../projections/sessions';
-import { workingSets } from '../projections/sessions';
+import { workingSets, selectSessionProgress } from '../projections/sessions';
+import { exerciseName } from '../data/exercises';
+import type { CurrentGoalProjection } from '../projections/goal';
 import type { ContextState } from '../context/completeness';
 import type { UserContextProjection } from '../projections/userContext';
 
 /**
  * A compact, human-readable dump of everything a tester's log knows.
  *
- * Deliberately NOT the raw event JSON. Three reasons: the raw log for four
- * weeks is ~100KB, which Android's share sheet silently truncates; nobody
- * reads JSON in a WhatsApp thread; and the raw log carries the free-text
- * "why" a tester wrote down, which they did not agree to hand over. This
- * keeps behaviour and drops prose.
+ * Deliberately NOT the raw event JSON: four weeks is ~100KB, which Android's
+ * share sheet silently truncates, and nobody reads JSON in a chat thread.
  *
  * Behavioural data beats opinions — a tester who says "it was fine" and a
  * digest showing they stopped after session 3 are telling you two very
  * different things, and only one of them is true.
+ *
+ * ON FREE TEXT. The original comment here said this "keeps behaviour and
+ * drops prose", which was never true — skip notes and review notes were
+ * always printed — and is further from true now that the goal's `why` and the
+ * check-in notes are too. They are the most useful lines in the file and the
+ * reason the review gate exists. So the honest version is not to omit them
+ * but to SAY SO: the digest names what it contains, in the first few lines,
+ * and the tester reads the whole thing in the share sheet before it goes
+ * anywhere. `exportLogToFile` remains the separate, complete copy.
  */
 export function buildDigest(
   sessions: SessionsProjection,
@@ -22,6 +30,7 @@ export function buildDigest(
   profile: UserContextProjection,
   appVersion: string,
   unreadable: { seq: number; type: string; reason: string }[] = [],
+  goal: CurrentGoalProjection | null = null,
 ): string {
   const all = sessions.order
     .map((id) => sessions.byId[id])
@@ -33,6 +42,8 @@ export function buildDigest(
   const L: string[] = [];
   L.push(`FitMVP test data · build ${appVersion}`);
   L.push(`generated ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`);
+  L.push('Includes your setup, your goal and why, every session, and anything');
+  L.push('you typed into a check-in, a skip or a review. Read it before sending.');
   L.push('');
   L.push(`SETUP`);
   L.push(`  experience: ${profile.experience ?? '—'}`);
@@ -41,6 +52,28 @@ export function buildDigest(
   L.push(`  owns: ${profile.ownedEquipment.length > 0 ? profile.ownedEquipment.join(', ') : '—'}`);
   L.push(`  injuries: ${profile.knownInjuries.length > 0 ? profile.knownInjuries.join(', ') : 'none'}`);
   L.push(`  bodyweight: ${profile.profile?.weight_kg ?? '—'} kg`);
+  // ── Added 2026-10-18 ──
+  // These were asked at onboarding and then absent from the only artefact
+  // that comes back. A verdict of "too much" means nothing without knowing
+  // whether it came from a 58-year-old novice or a 24-year-old who lifts.
+  const pr = profile.profile;
+  L.push(`  age/height/sex: ${pr?.age ?? '—'} · ${pr?.height_cm ?? '—'}cm · ${pr?.sex ?? '—'}`);
+  L.push(`  day: up ${profile.routine?.wakeHour ?? '—'} · bed ${profile.routine?.sleepHour ?? '—'} · trains ${profile.routine?.sessionWindow ?? '—'}`);
+  if (profile.declaredLifts !== undefined && Object.keys(profile.declaredLifts).length > 0) {
+    L.push(`  declared: ${Object.entries(profile.declaredLifts)
+      .map(([id, kg]) => `${exerciseName(id)} ${kg}kg`).join(' · ')}`);
+  }
+  L.push('');
+  // THE GOAL, which was missing entirely. "Goal is gravity" is principle #3
+  // and the one piece of context every verdict has to be read against — a
+  // session judged "too much" by someone cutting is a different finding from
+  // the same word out of someone trying to add size.
+  L.push(`GOAL`);
+  L.push(`  ${goal?.goalType ?? '— not set —'}${
+    goal !== null && goal.revisionCount > 0 ? `  (revised ${goal.revisionCount}×)` : ''
+  }`);
+  if (goal?.why) L.push(`  why: "${goal.why}"`);
+  if (goal?.targetDate) L.push(`  by: ${goal.targetDate}`);
   L.push('');
   if (unreadable.length > 0) {
     L.push(`⚠ ${unreadable.length} UNREADABLE ROW(S) — projections below are incomplete`);
@@ -70,7 +103,16 @@ export function buildDigest(
     L.push(`${mark} ${s.trainingDay}  ${s.workoutName}  [${s.status}]`);
     if (s.checkin) {
       const sore = s.checkin.soreness.map((x) => `${x.muscle}${x.level}`).join(' ');
-      L.push(`    energy ${s.checkin.energy}${sore ? ` · sore: ${sore}` : ''}`);
+      // The energy figure is now one of three buttons (rough 2 / ok 6 /
+      // good 9), so print the word as well — a bare "6" in a report read
+      // months later is the same unexplained number the screen used to show.
+      const feel = s.checkin.energy <= 3 ? 'rough' : s.checkin.energy >= 9 ? 'good' : 'ok';
+      L.push(`    feel ${feel} (${s.checkin.energy})${sore ? ` · sore: ${sore}` : ''}`);
+      // PreCheckinRecorded has carried an optional `notes` since 7a and the
+      // digest never printed it — a tester typing "shoulder still bad, slept
+      // 4 hours" into the check-in had it vanish from the only thing that
+      // comes back.
+      if (s.checkin.notes) L.push(`      "${s.checkin.notes}"`);
     }
     if (s.skipReason) L.push(`    reason: ${s.skipReason}`);
     if (s.skipNotes) L.push(`      "${s.skipNotes}"`);
@@ -88,9 +130,12 @@ export function buildDigest(
     // the session people actually stop.
     const prescribed = s.exercises.reduce((n, e) => n + e.sets, 0);
     if (s.exercises.length > 0) {
-      L.push(`    prescribed ${s.exercises.length} exercises / ${prescribed} sets · logged ${w.length} sets`);
+      L.push(`    prescribed ${s.exercises.length} exercises / ${prescribed} sets · logged ${w.length} set${w.length === 1 ? '' : 's'}`);
     }
-    for (const e of s.exercises) {
+    // A SKIPPED session gets no per-exercise breakdown: three lines of
+    // "nothing logged" is noise, and the prescribed line above already says
+    // what was on offer. Only sessions someone actually opened get the detail.
+    for (const e of (s.status === 'skipped' ? [] : s.exercises)) {
       const mine = w.filter((x) => x.exerciseId === e.exerciseId);
       if (mine.length === 0) {
         L.push(`      · ${e.name} — nothing logged`);
@@ -102,7 +147,18 @@ export function buildDigest(
       L.push(`      · ${e.name}: ${detail}`);
     }
     for (const sub of s.substitutions) {
-      L.push(`      swapped ${sub.originalExerciseId} → ${sub.substituteExerciseId} (${sub.reason})`);
+      // Names, not library ids. `Barbell_Bench_Press_-_Medium_Grip` is not
+      // something anyone reads in a chat thread.
+      L.push(`      swapped ${exerciseName(sub.originalExerciseId)} → ${exerciseName(sub.substituteExerciseId)} (${sub.reason})`);
+    }
+    // WHERE THEY STOPPED. A session left `active` is the most informative row
+    // in the file — it is someone walking out mid-workout — and it was
+    // reported only as "[active]" with no indication of how far they got.
+    if (s.status === 'active' || s.status === 'scheduled') {
+      const pg = selectSessionProgress(s);
+      L.push(`    stopped after ${pg.exercisesDone}/${pg.exercisesTotal} exercises${
+        pg.nextExerciseName !== null ? ` · next would have been ${pg.nextExerciseName}` : ''
+      }`);
     }
     L.push('');
   }
