@@ -175,6 +175,37 @@ const KCAL_FLOOR: Record<Sex, number> = { f: 1200, other: 1200, m: 1500 };
 const FAT_PCT_OF_KCAL = 0.25;
 const FAT_FLOOR_PER_KG = 0.8;
 
+/**
+ * Whether a profile carries enough to compute a target at all, and the input
+ * if it does.
+ *
+ * LIVES HERE, not in FitnessContext, because FitnessContext imports
+ * react-native and no check can execute it. The version that lived there read
+ *
+ *     profile.sex !== 'other' && profile.height_cm !== 170
+ *
+ * to detect onboarding's defaults — which meant anyone genuinely 170cm tall
+ * never saw a calorie target, and anyone who declined to state their sex was
+ * refused one although 'other' is a real answer the formula handles. The three
+ * fields are optional on the schema now, so absent means absent and this is a
+ * presence test.
+ */
+export function nutritionInputFrom(
+  profile: {
+    weight_kg: number;
+    height_cm?: number | undefined;
+    age?: number | undefined;
+    sex?: Sex | undefined;
+  } | null,
+  daysPerWeek: number,
+  goal: NutritionInput['goal'],
+): NutritionInput | null {
+  if (profile === null) return null;
+  const { weight_kg: weightKg, height_cm: heightCm, age, sex } = profile;
+  if (heightCm === undefined || sex === undefined || age === undefined) return null;
+  return { weightKg, heightCm, age, sex, daysPerWeek, goal };
+}
+
 export function nutritionTargets(input: NutritionInput): NutritionTargets {
   const { weightKg, heightCm, sex, daysPerWeek, goal } = input;
   const estimatedAge = input.age === undefined;

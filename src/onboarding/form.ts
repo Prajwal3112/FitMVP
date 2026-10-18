@@ -1,6 +1,8 @@
 import type { Equipment } from '../constants/workouts';
 import type { Experience, OwnedEquipment } from '../events/userContext';
-import type { DeclaredLifts } from './declaredLifts';
+import {
+  shouldAskDeclaredLifts, implausibleDeclaredLift, type DeclaredLifts,
+} from './declaredLifts';
 
 /**
  * Onboarding's form shape, validation, and event payload — as plain
@@ -17,8 +19,30 @@ import type { DeclaredLifts } from './declaredLifts';
  * belongs in a module a test can import.
  */
 
+/** Hour-of-day choices, kept coarse — nobody knows their wake time to the minute. */
+export type Sex = 'm' | 'f' | 'other';
+
 export type OnboardingForm = {
   weight: string;
+  /**
+   * The three below exist so the calorie and macro targets can be computed at
+   * all. They were DEFAULTED (height 170cm, sex 'other', age absent) and only
+   * askable from Setup, which a tester has no reason to open — so nutrition
+   * showed nothing for everyone, and `profileComplete` detected the default by
+   * testing `height_cm !== 170`, which permanently excluded anyone who is
+   * actually 170cm tall.
+   */
+  heightCm: string;
+  sex: Sex | null;
+  age: string;
+  /**
+   * Wake and sleep hours. Asked because "when can I start the next session"
+   * cannot be answered without knowing when the person is awake, and because
+   * the coach layer that arrives after four weeks is supposed to speak about
+   * the user's actual week.
+   */
+  wakeHour: number | null;
+  sleepHour: number | null;
   workoutTime: string;
   equipment: Equipment | null;
   /** How long they've trained. Drives load estimates and whether RPE shows. */
@@ -41,6 +65,11 @@ export type OnboardingForm = {
 export function emptyOnboardingForm(): OnboardingForm {
   return {
     weight: '',
+    heightCm: '',
+    sex: null,
+    age: '',
+    wakeHour: null,
+    sleepHour: null,
     workoutTime: 'morning',
     equipment: null,
     experience: null,
@@ -63,22 +92,80 @@ export function emptyOnboardingForm(): OnboardingForm {
  * Returns null when the form is complete, or the reason it is not.
  */
 export function validateOnboardingForm(form: OnboardingForm): string | null {
-  if (form.weight.trim().length === 0) return 'Bodyweight is required';
-  const weightNum = Number(form.weight);
-  if (!Number.isFinite(weightNum) || weightNum <= 0) return 'Bodyweight must be a number';
-  // A mistyped bodyweight silently skews every starting-load estimate, and
-  // there is no way to correct a logged set afterwards.
-  if (weightNum < 25 || weightNum > 400) return 'That bodyweight looks like a typo';
-  if (form.equipment === null) return 'Where you train is required';
-  if (form.experience === null) return 'Experience is required';
-  if (form.daysPerWeek === null) return 'Days per week is required';
+  // Composed from the per-step gates so the two can never disagree. The whole
+  // form is complete exactly when no step is blocked.
+  for (const step of onboardingSteps(form)) {
+    const blocked = stepBlocker(form, step);
+    if (blocked !== null) return blocked;
+  }
   return null;
 }
 
-const DEFAULT_HEIGHT_CM = 170;
-const DEFAULT_SEX = 'other' as const;
-const DEFAULT_WAKE_HOUR = 7;
-const DEFAULT_SLEEP_HOUR = 23;
+// ─── Phasing ─────────────────────────────────────────────────────────
+// Nine sections on one scroll, with the keyboard covering the field being
+// typed into and "WHAT DO YOU LIFT NOW?" sitting BELOW the Continue button,
+// where an experienced lifter tapped Continue and never saw it. One question
+// at a time, and the step order is the question order.
+
+export type OnboardingStepId =
+  | 'experience' | 'days' | 'place' | 'body' | 'rhythm' | 'injuries' | 'lifts';
+
+/**
+ * The steps THIS form will show, in order. `lifts` is conditional: a beginner
+ * has no numbers to give and asking invites a guess worse than our estimate.
+ */
+export function onboardingSteps(form: OnboardingForm): OnboardingStepId[] {
+  const steps: OnboardingStepId[] = [
+    'experience', 'days', 'place', 'body', 'rhythm', 'injuries',
+  ];
+  if (shouldAskDeclaredLifts(form.experience)) steps.push('lifts');
+  return steps;
+}
+
+/** Why this step cannot be left yet, or null when it can. */
+export function stepBlocker(form: OnboardingForm, step: OnboardingStepId): string | null {
+  switch (step) {
+    case 'experience':
+      return form.experience === null ? 'Pick where you are starting from' : null;
+    case 'days':
+      return form.daysPerWeek === null ? 'Pick how many days a week' : null;
+    case 'place':
+      return form.equipment === null ? 'Pick where you will train' : null;
+    case 'body': {
+      if (form.weight.trim().length === 0) return 'Your bodyweight is needed to suggest weights';
+      const w = Number(form.weight);
+      if (!Number.isFinite(w) || w <= 0) return 'Bodyweight must be a number';
+      // A mistyped bodyweight silently skews every starting-load estimate, and
+      // there is no way to correct a logged set afterwards.
+      if (w < 25 || w > 400) return 'That bodyweight looks like a typo';
+      // Height, age and sex are OPTIONAL. They only buy the calorie target,
+      // and refusing to let someone train until they disclose their sex would
+      // be the worst trade in the app.
+      if (form.heightCm.trim().length > 0) {
+        const h = Number(form.heightCm);
+        if (!Number.isFinite(h) || h < 100 || h > 250) return 'That height looks like a typo';
+      }
+      if (form.age.trim().length > 0) {
+        const a = Number(form.age);
+        if (!Number.isFinite(a) || a < 13 || a > 100) return 'That age looks like a typo';
+      }
+      return null;
+    }
+    // Both optional: a wake hour buys better "when next" copy and nothing
+    // else, and injuries are a list that is legitimately empty.
+    case 'rhythm':
+    case 'injuries':
+      return null;
+    case 'lifts': {
+      for (const [, kg] of Object.entries(form.declaredLifts)) {
+        const bad = implausibleDeclaredLift(kg);
+        if (bad !== null) return bad;
+      }
+      return null;
+    }
+  }
+}
+
 const DEFAULT_SESSION_MAX_MINUTES = 60;
 const DEFAULT_ROLLOVER_HOUR = 4;
 
@@ -89,16 +176,26 @@ export function formToOnboardingPayload(form: OnboardingForm) {
   if (equipment === null || experience === null || daysPerWeek === null) {
     throw new Error('Onboarding form incomplete'); // unreachable; narrows types
   }
+  // Each optional field is written only when the user gave it. The previous
+  // version wrote height 170 / sex 'other' unconditionally, which is a
+  // fabricated fact in an append-only log — and then detected its own
+  // fabrication by comparing against the constant.
+  const num = (s: string): number | null => {
+    const n = Number(s);
+    return s.trim().length > 0 && Number.isFinite(n) ? n : null;
+  };
+  const height = num(form.heightCm);
+  const age = num(form.age);
   return {
     profile: {
-      // No `age`: the form never asked for one, and nothing reads it.
-      height_cm: DEFAULT_HEIGHT_CM,
       weight_kg: Number(form.weight),
-      sex: DEFAULT_SEX,
+      ...(height !== null ? { height_cm: height } : {}),
+      ...(age !== null ? { age: Math.round(age) } : {}),
+      ...(form.sex !== null ? { sex: form.sex } : {}),
     },
     routine: {
-      wakeHour: DEFAULT_WAKE_HOUR,
-      sleepHour: DEFAULT_SLEEP_HOUR,
+      ...(form.wakeHour !== null ? { wakeHour: form.wakeHour } : {}),
+      ...(form.sleepHour !== null ? { sleepHour: form.sleepHour } : {}),
       sessionWindow: form.workoutTime,
     },
     equipment,

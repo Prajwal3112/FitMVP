@@ -167,9 +167,10 @@ export default function SetupScreen({
         </View>
 
         {/* These three exist so the calorie and macro targets can be computed.
-            Onboarding defaults height to 170cm and sex to 'other' rather than
-            asking, so until they are given here, nutrition shows nothing
-            rather than a number built on a default. */}
+            Onboarding now asks for them (optionally) on its "a bit about you"
+            step; this is where you change or add them afterwards. Until all
+            three are present, nutrition shows nothing rather than a number
+            built on a default — see nutritionInputFrom. */}
         <Text style={styles.section}>YOU</Text>
         <Text style={styles.hint}>
           Only used to work out your calorie and protein targets. Nothing else

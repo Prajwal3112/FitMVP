@@ -13,16 +13,26 @@ export const ProfileSchema = z.object({
    * existing payload valid, so no schemaVersion bump.
    */
   age: z.number().int().min(0).max(150).optional(),
-  height_cm: z.number().positive().max(300),
+  /**
+   * ALSO OPTIONAL, for the same reason, 2026-10-18. Both were written
+   * unconditionally as height 170 / sex 'other', which puts a fabricated fact
+   * in an append-only log — and then `profileComplete` detected the
+   * fabrication by testing `height_cm !== 170`, so anyone genuinely 170cm
+   * tall was treated as incomplete forever and never saw a calorie target.
+   * Absent now means absent. Widening; every existing payload still parses,
+   * so no schemaVersion bump (see ARCHITECTURE §15).
+   */
+  height_cm: z.number().positive().max(300).optional(),
   weight_kg: z.number().positive().max(500),
-  sex: z.enum(['m', 'f', 'other']),
+  sex: z.enum(['m', 'f', 'other']).optional(),
 });
 
 export type Profile = z.infer<typeof ProfileSchema>;
 
 export const RoutineSchema = z.object({
-  wakeHour: z.number().int().min(0).max(23),
-  sleepHour: z.number().int().min(0).max(23),
+  /** Optional for the same reason as the profile fields above. */
+  wakeHour: z.number().int().min(0).max(23).optional(),
+  sleepHour: z.number().int().min(0).max(23).optional(),
   sessionWindow: z.string(),                          // e.g., '07:00'
 });
 

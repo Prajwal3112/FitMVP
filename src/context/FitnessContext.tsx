@@ -68,7 +68,9 @@ import { reentryPolicy, scaleLoad, type ReentryPolicy } from '../session/reentry
 import { buildSessionDraft, type ScheduledSessionDraft } from '../session/scheduler';
 import { buildDigest } from '../dev/digest';
 import { exportLogToFile, type ExportResult } from '../dev/exportFile';
-import { nutritionTargets, type NutritionTargets } from '../nutrition/targets';
+import {
+  nutritionTargets, nutritionInputFrom, type NutritionTargets,
+} from '../nutrition/targets';
 import { selectWhatWorks, selectWhatWorksGap, type Insight } from '../projections/whatWorks';
 import { APP_BUILD } from '../constants/build';
 import {
@@ -658,23 +660,19 @@ export const FitnessProvider: React.FC<{ children: ReactNode }> = ({ children })
   // as answers. Imperfect — someone genuinely 170cm has to re-enter it — but
   // it beats presenting a calorie target derived from a default.
   const profile = userContext.profile;
-  const profileComplete =
-    profile !== null &&
-    profile.age !== undefined &&
-    profile.sex !== 'other' &&
-    profile.height_cm !== 170;
-
-  const nutrition = useMemo<NutritionTargets | null>(() => {
-    if (profile === null || !profileComplete) return null;
-    return nutritionTargets({
-      weightKg: profile.weight_kg,
-      heightCm: profile.height_cm,
-      ...(profile.age !== undefined ? { age: profile.age } : {}),
-      sex: profile.sex,
-      daysPerWeek,
-      goal: goalKind,
-    });
-  }, [profile, profileComplete, daysPerWeek, goalKind]);
+  // The gate is `nutritionInputFrom`, which lives beside the formula in a
+  // module a check can import. It used to be four inline conditions here,
+  // one of which was `profile.height_cm !== 170` — a sentinel that treated
+  // everyone genuinely 170cm tall as incomplete forever.
+  const nutritionInput = useMemo(
+    () => nutritionInputFrom(profile, daysPerWeek, goalKind),
+    [profile, daysPerWeek, goalKind],
+  );
+  const profileComplete = nutritionInput !== null;
+  const nutrition = useMemo<NutritionTargets | null>(
+    () => (nutritionInput === null ? null : nutritionTargets(nutritionInput)),
+    [nutritionInput],
+  );
 
   const whatWorks = useMemo(() => selectWhatWorks(sessions), [sessions]);
   const whatWorksGap = useMemo(() => selectWhatWorksGap(sessions), [sessions]);
