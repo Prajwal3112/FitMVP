@@ -17,7 +17,7 @@ Not templates. An adaptive coach that keeps the user's goal in context for month
 
 Recommended first read: CLAUDE.md → ARCHITECTURE §1–§8 + §10 → BLUEPRINT Parts 6–11. Around 15K tokens total.
 
-## Current build state (as of 2026-09-26)
+## Current build state (as of 2026-10-18)
 
 Vertical-slice build in progress. **Steps 1–6 done and verified on Android.
 Steps 7a + 7c code-complete. Revalidated and hardened 2026-09-26 — five
@@ -582,6 +582,24 @@ are real on a phone. A chain that silently accepts a rewritten `trainingDay`
 detects none of them, which is worse than having none at all — it reports
 health it cannot see.
 
+## Ready to hand out — build `0.3.0-gym`, versionCode 4 (2026-10-18)
+
+Every item on the device-test ship list is closed. `npm run check` is
+**39 suites, 0 failures**; `tsc --noEmit` exit 0. What shipped in this pass,
+shortest to longest: the session is no longer exitable by accident · three
+labelled feel buttons that genuinely change the session · `targetRpe` and
+`restSec` reach a screen in words, so the pixel test is **0 of 6 unrendered,
+down from 6 of 6** · steppers on the set you are filling · Resume says what it
+resumes · mid-session swap (`ExerciseSubstituted`'s first emitter) · "when can
+I do the next one" · onboarding phased one question per screen · five
+fabricated profile fields replaced with real questions · `GoalRevised` wired ·
+the tester report carries everything the log knows.
+
+**Never run on a phone.** Expo Go failed (the phone could not reach the Mac;
+firewall suspected, untestable from the Mac side) and the ngrok tunnel died
+with "remote gone away". **EAS is the path:** `eas build -p android --profile
+preview`. That is the one thing between here and a tester's hands.
+
 ## How the app gets onto a tester's phone (current stage)
 
 Persona/onboarding studies are **parked**. The delivery path below is what
@@ -1118,54 +1136,94 @@ automated checks could not.
       start. We'll add the fourth once three is a habit."* Audit every
       `split.warning` and `reason` string for the same tone.
 
-### 7.4 — The gym-hands pass (5 findings)
-- [ ] **Steppers, not keyboards**, for weight and reps. Sweaty hands, one hand
-      free. The keyboard also covers the row being edited.
-- [ ] **Remove a set**, and remove a warm-up set. Add-only today, and
-      `warmupCount` is local state so added warm-up rows vanish on reload.
-- [ ] **Lock the session.** `Workout` has `options={{ title: '' }}` — no back
-      guard, no `BackHandler`. Back silently exits a live session. Must ask:
-      abandon, or skip the day? (The *review* screen was locked; the session
-      was not.)
-- [ ] **Resume must show where you were.** It restores logged sets but says
-      nothing about how much is done or what is next.
-- [ ] **Label the scales.** Energy 1-10 has no explanation — and only `<=3` vs
-      `>3` changes anything, so **7 of the 10 dots do nothing**. Either make
-      'good' mean something or ship three buttons (Phase 3.4 already says so).
-      Soreness levels have a hint, but it sits below the chips and the feedback
-      is three tiny dots; users tap repeatedly and read it as a bug.
+### 7.4 — The gym-hands pass — DONE 2026-10-18
+- [x] **Steppers, not keyboards.** The set you are about to fill carries
+      −2.5/+2.5 kg and −1/+1 rep as 44pt targets. Only that row — steppers on
+      all eighteen rows would be eighteen more targets, and the rows above are
+      history you are not editing. Text fields stay for what two buttons
+      cannot reach. 2.5kg because it is the smallest increment loadable on a
+      bar (a pair of 1.25s), the same reason `MIN_LOADABLE_STEP_KG` is 2.5.
+- [x] **Remove a set** — long-press ✓, via the `SetRemoved` tombstone.
+- [x] **Lock the session.** `BackHandler` swallows back and opens a dialog
+      with three honest exits: keep going · leave it and come back (stays
+      `active`) · skip today. Header arrow and swipe gesture removed from the
+      route (`headerLeft: () => null, gestureEnabled: false`).
+- [x] **Resume shows where you were.** `selectSessionProgress` in the
+      projection (not the screen, so a check can drive it) → *"4 sets logged ·
+      2 of 3 exercises · next up Pushups"*, and the button reads "Pick up
+      where you left off". Three things an inline version would have got
+      wrong: a warm-up is not progress, a skipped exercise leaves the
+      denominator so "2 of 3" can complete, and an all-started session points
+      at nothing rather than looping to the first.
+- [x] **The scales are labelled, and `good` now does something.** Three
+      buttons — Rough / OK / Good — each saying what it does, writing 2/6/9 so
+      the 1–10 schema keeps its meaning. A good day does NOT add volume
+      (adding on good days and cutting on bad ones is a random walk with no
+      overload); it raises the ceiling through a new `rpeBonus` the scheduler
+      adds before capping. Measured: 12 sets @ RPE 7 · 18 @ 9 · 18 @ 10, and
+      three distinct ceilings for a novice too. The old test asserted
+      `maxRpe === 9`, which passed while meaning nothing — `maxRpe` is a cap
+      and every goal's ceiling is already ≤9, so `min()` never moved.
 
-### 7.5 — When is my next session?
-- [ ] Nothing in the app says when to train next. Needs 7.1's schedule answer,
-      then Home can say "Next: Thursday" and a rest day can read as a rest day
-      rather than an unstarted workout.
+### 7.5 — When is my next session? — DONE 2026-10-18
+- [x] `selectNextSession` in `src/session/nextSession.ts`. The hard part was
+      honesty: **the rotation advances on completion, never the date**, so
+      there is no "your next session is Thursday" to give, and inventing one
+      would be the first lie in an app whose pitch is that it does not pretend
+      to know things. What it says instead:
 
-### 7.6 — Mid-session swap, slot-constrained
-- [ ] "The machine is taken" is the commonest real-gym event and there is no
-      path. `findSubstitutesTiered` exists, is tested, has **zero consumers**.
-      The swap must offer only exercises valid for that slot's movement
-      pattern, which is exactly what the tiered search does.
+      > **Tomorrow**
+      > 4 days a week works out at a session every other day or so. Today's
+      > muscles want about 36 hours, so the day after tomorrow before you load
+      > them again — tomorrow trains something else.
 
-### 7.7 — Movement explanations, lightweight
+      36h is **imported** from `resolve.ts`, not re-declared; two sources of
+      truth for a recovery window would eventually name a time the engine then
+      refuses. Shown on Completion and on Home, where "Done for today" was a
+      dead end. Derived in `FitnessContext` keyed on `dayTick`, never in a
+      screen's `useMemo` — that is the overnight-staleness bug again.
+      Never names a weekday, never forbids training, never counts down in
+      hours (a counter invites training at 2am to beat it).
+
+### 7.6 — Mid-session swap — DONE 2026-10-18
+- [x] `src/session/swap.ts` + `substituteExercise` in `commands.ts`.
+      `findSubstitutesTiered` and `ExerciseSubstituted` both got their first
+      consumer; the projection already applied the event and the card already
+      rendered `swappedFrom`, so the path existed end to end with nothing to
+      start it. The screen asks **why first**, because the answer inverts the
+      ranking: same pattern first for "can't get to it" (*your weights carry
+      over*), away from that pattern for "it hurts" — a hurting shoulder
+      should not be handed another press.
+      Two things `proposeSwaps` does that the tiered search alone does not:
+      excludes what is already in today's session (offering slot 2's squat for
+      slot 1 quietly halves coverage), and carries the scheduler's own filters
+      so a user-chosen swap can never produce something §8.7 would have
+      refused.
+
+### 7.7 — Movement explanations, lightweight — STILL OPEN
+- [x] 89 bundled photos (1.14 MB) cover every prescribable exercise.
 - [ ] The founder asked for video; the measurement argues against it. Only
       **39 of 743 exercises are ever prescribed** and ~33 are canonical
       (Barbell Squat, Bench Press, Romanian Deadlift, Chin-Up). Text for all
       39 is **34 KB**; for the ~6 genuinely obscure ones, **under 5 KB**. Video
       means megabytes or a network call, and this app has no network by design.
-      **Cheapest fix first: rename the six obscure ones** (Thigh Abductor, Air
-      Bike, Cable Crunch, Glute Kickback) to recognisable names — 0 KB.
+      **Cheapest fix still undone: rename the six obscure ones** (Thigh
+      Abductor, Air Bike, Cable Crunch, Glute Kickback) to recognisable
+      names — 0 KB.
 
-### 7.8 — The tester report is incomplete (blocks segmenting pain by client)
-- [ ] **`PreCheckinRecorded.notes` is collected and never reported.** "Slept
-      badly, shoulder feels off, short on time" — prime free text, invisible.
-- [ ] **The goal and the `why` never reach the report**, so pain cannot be
-      segmented by goal.
-- [ ] The report prints only experience / daysPerWeek / where. Add bodyweight,
-      injuries, session length, goal, schedule and (once asked) gender, so a
-      complaint can be attributed to a *type* of client.
-- [ ] **Validation gate:** feed the report a synthetic cohort and confirm every
-      free-text channel and every profile field appears. Three channels exist
-      (review note, skip note, check-in note) and only two are wired.
+### 7.8 — The tester report — DONE 2026-10-18
+- [x] All of it, plus the synthetic-cohort gate (`checks/digest.ts`, driven
+      from the real onboarding payload builder, so a field the form can
+      produce but the report cannot print now fails the build). Added: the
+      goal and the `why`, the check-in notes, age/height/sex/wake/sleep/
+      declared lifts, and **how far an abandoned session got** — a session
+      left `active` is someone walking out mid-workout, the most informative
+      row in the file, and it read as "[active]" and nothing else.
+      Swaps print names not `Wide-Grip_Lat_Pulldown`; energy prints its word
+      ("feel rough (2)"). The file's comment claimed it "keeps behaviour and
+      drops prose" — never true, and further from true now, so the digest
+      names what it contains in its first four lines and says to read it
+      before sending.
 
 ### 7.9 — Re-validate after each change
 - [ ] After every item above: `npm run check`, then re-run the persona sweep
@@ -1174,6 +1232,52 @@ automated checks could not.
       improves things, rather than assuming it does.** Two changes in this
       session made things worse before measurement caught them (flooring
       `loadStep`, and the first `reachability` pixel test).
+
+### 7.10 — Onboarding phased, and five fabricated fields — 2026-10-18
+
+**It was nine sections on one scroll.** The keyboard covered the field being
+typed into, and **"WHAT DO YOU LIFT NOW?" sat BELOW the Continue button** — so
+an experienced lifter, the only person that question exists for, tapped
+Continue and never saw it. That is the question worth a factor of three on
+day-one load.
+
+Now one question per screen: experience → days → place → about you → your day
+→ injuries → what you lift. Six steps for a beginner, seven for anyone with
+numbers to give. Progress count, Back link, button pinned to the bottom. The
+step list and every gate live in `src/onboarding/form.ts`, and **whole-form
+validity is composed from the per-step gates** rather than being a second copy
+of them.
+
+**FIVE FIELDS WERE FABRICATED.** `height 170`, `sex 'other'`, `wakeHour 7`,
+`sleepHour 23` and no age were written into an append-only log for every user,
+with no input anywhere in onboarding. Then `profileComplete` detected its own
+default by testing
+
+```
+profile.sex !== 'other' && profile.height_cm !== 170
+```
+
+so **anyone genuinely 170cm tall never saw a calorie target**, and anyone who
+declined to state their sex was refused one although the formula handles
+'other' honestly as the midpoint. All five are now asked, marked optional, and
+written only when given; absent means absent. `height_cm`, `sex`, `wakeHour`
+and `sleepHour` widened to optional — every existing payload still parses, so
+no `schemaVersion` bump.
+
+**The gate moved to `nutritionInputFrom`, beside the formula**, because the
+version in `FitnessContext` could not be executed by any check — react-native
+does not load under `tsx`. Same rule that put onboarding validation in
+`form.ts`, applied to the thing that broke next.
+
+**Also:** goal changes now emit `GoalRevised` instead of appending a second
+`GoalCreated` (one event per changed field; tapping Save unchanged writes
+nothing). `src/constants/workouts.ts` went 116 → 32 lines — the three-template
+rotation and `getTodaysWorkout` are gone, the latter having shipped in the
+production bundle with a `throw` on its unreachable branch *inside a function
+called during render*.
+
+**`draftSessionResumed` is the only draft left with no emitter**, and stays
+that way deliberately — Step 7b is cut from v1.
 
 **Engineering debt — interleave, don't batch.**
 - [~] D.1 **The per-tap replay is fixed; the cold fold is still quadratic.**
@@ -1260,6 +1364,28 @@ automated checks could not.
 - **`expo-file-system` v19 uses the CLASS api**, not the old
   `FileSystem.writeAsStringAsync`: `new File(Paths.cache, name)`, `.create()`,
   `.write(text)`, `.uri`. The legacy functions are gone in SDK 54.
+- **Writing a default into an append-only log is not a default, it is a
+  fabricated fact.** Onboarding wrote height 170 / sex 'other' / wake 7 /
+  sleep 23 for every user, and `profileComplete` then detected its own
+  fabrication by comparing against the constant — so a real 170cm user was
+  excluded from nutrition forever. If a field has not been given, leave it
+  absent and widen the schema. Absence is a fact; 170 is a lie.
+- **A check that cannot execute the thing it guards is not a guard.** Both
+  times a gate was found broken it lived in a module importing react-native,
+  which `tsx` cannot load: onboarding validation (14 suites green while the
+  form was unusable) and `profileComplete`. **Anything that decides whether a
+  user can proceed, or whether a number is shown, goes in a module with no
+  React and no DB import.**
+- **Writing a test time as `'...Z'` on this machine is a bug.** It is
+  `Asia/Calcutta`, so `17:00Z` is 22:30 local, and the 4am `trainingDayOf`
+  boundary makes every day-label judgement local. Build test dates field by
+  field (`new Date(2026, 9, 18, 17)`). Cost two wrong "failures" against
+  correct code in `checks/next_session.ts`.
+- **The pixel test catches a value no screen NAMES, not a value no screen
+  reaches.** `split.warning` reads as NO PIXEL and is in fact rendered — the
+  scheduler folds it into `reasons`, which both Home and Workout display.
+  Verified by execution. A probe for it would report its own blind spot as a
+  defect.
 - **The rest timer is on-screen only.** A timer that fires with the app backgrounded needs `expo-notifications`, which isn't a dependency yet.
 
 ## What NOT to do

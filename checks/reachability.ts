@@ -165,7 +165,24 @@ const pixel: [string, RegExp][] = [
   ['slot.targetRpe',    /\.targetRpe\b/],
   ['params.restSec',    /\.restSec\b/],
   ['reasons beyond [0]', /reasons\s*\.\s*(map|slice|join)|reasons\[[1-9]/],
+  // Added with the features themselves, 2026-10-18, so each one is guarded
+  // from the day it lands rather than being discovered dead months later.
+  ['session progress',  /\.setsLogged\b|resumeLine/],
+  ['nextSession',       /nextSession\.|next\.label/],
+  ['swap options',      /swapOptions\(/],
+  ['declaredLifts',     /declaredLifts/],
 ];
+// split.warning is NOT probed here, and that is deliberate. CLAUDE.md listed
+// it as never displayed; it is in fact folded into `reasons` by the scheduler
+// and rendered on both Home and Workout — verified by execution, which is the
+// only way to see it, since a text probe for `.warning` finds nothing in any
+// screen. A probe that said NO PIXEL here would be reporting its own blind
+// spot as a defect.
+//   buildSessionDraft({ experience: 'new', daysPerWeek: 6, ... }).reasons[1]
+//   → "You said six days. Starting there almost never lasts — three sessions
+//      you actually do beat six you abandon."
+// This is the limit of the technique: it catches a value no screen NAMES, not
+// a value no screen reaches.
 const noPixel: string[] = [];
 for (const [label, re] of pixel) {
   const rendered = re.test(screenText);

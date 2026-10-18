@@ -3,4 +3,4 @@
  * builds for weeks, and a bug report without a build number is a bug
  * report you cannot place.
  */
-export const APP_BUILD = '0.2.0-dark';
+export const APP_BUILD = '0.3.0-gym';
