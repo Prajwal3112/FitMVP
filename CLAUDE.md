@@ -597,10 +597,46 @@ I do the next one" · onboarding phased one question per screen · five
 fabricated profile fields replaced with real questions · `GoalRevised` wired ·
 the tester report carries everything the log knows.
 
-**Never run on a phone.** Expo Go failed (the phone could not reach the Mac;
-firewall suspected, untestable from the Mac side) and the ngrok tunnel died
-with "remote gone away". **EAS is the path:** `eas build -p android --profile
-preview`. That is the one thing between here and a tester's hands.
+### THE APK EXISTS — built and verified 2026-10-18
+First successful build. `@elbmak/FitMVP`, project
+`90384a1f-1896-46d8-a83a-ee962cf28067`, build
+`077a58ba-1c40-4768-95fb-102f18842e14`.
+
+    https://expo.dev/artifacts/eas/KP-syJ452PaiHDMtWCylTqweet8c1P_p0FbBKEOy_-8.apk
+
+75 MB · versionCode 4 · runtime `020f5a2b0bb830f9e96b1c8b033882a2c843a3a1`
+(a real fingerprint hash, not the app version — proof the policy took).
+Keystore generated and held by EAS, because `keytool` is not installed
+locally. **Never regenerate it**: updates would stop installing over the old
+app and every tester would lose their log.
+
+**Verified inside the artifact, not just in the source.** CLAUDE.md's own
+lesson was that *"an audit of first-party code cannot conclude anything about
+the artifact"* — that is how `allowBackup` shipped as `true`. So the binary
+AndroidManifest was parsed out of the APK (AXML string pool + attribute
+extension; note the attribute offsets are relative to the node extension at
+`pos+16`, not the chunk start, which cost one wrong read):
+
+| | |
+|---|---|
+| `allowBackup` | **false** ✓ — the event log stays off Google Drive |
+| `package` | `com.prajwal3112.fitmvp` ✓ |
+| `versionCode` | 4 ✓ |
+| `expo.modules.updates.ENABLED` + `EXPO_UPDATE_URL` | present, pointing at `u.expo.dev/90384a1f-…` ✓ |
+| `usesCleartextTraffic` | absent ✓ |
+| `libexpo-sqlite.so`, `assets/index.android.bundle` | present (2.4 MB bundle) |
+| architectures | arm64-v8a, armeabi-v7a, x86 |
+
+**Bonus finding that matters for B1: `enableOnBackInvokedCallback = false`.**
+On Android 13+ with predictive back opted IN, the legacy `BackHandler` does
+not fire — so the session lock would silently not work on new phones. It is
+opted out, so `BackHandler` is live. If an SDK upgrade ever flips this, the
+session lock breaks without a compile error. ⚠ Re-check it after D.2.
+
+**Still never run on a phone.** The APK exists and is structurally sound;
+nobody has opened it. Expo Go had failed earlier (the phone could not reach
+the Mac; firewall suspected) and the ngrok tunnel died with "remote gone
+away" — both now irrelevant, since the APK needs neither.
 
 ## How the app gets onto a tester's phone (current stage)
 
@@ -608,11 +644,30 @@ Persona/onboarding studies are **parked**. The delivery path below is what
 matters at this stage: each tester runs the real build on their own Android
 phone, unattended, for several weeks.
 
-### Why not Expo Go
+### Why not Expo Go — and the conflation to avoid
 Expo Go needs Metro running on the developer's laptop, is SDK-locked (Play
 Store Expo Go is SDK 57; this project is 54), and the app dies the moment the
 laptop closes. It is fine for a 20-minute sit-down; it cannot carry a
-multi-week unattended test. Use a standalone APK.
+multi-week unattended test.
+
+**THE EAS APK IS NOT EXPO GO.** The tester taps a link, approves "install from
+this source" once, and gets a normal app icon — no Expo app, no Expo account,
+no SDK matching, no Metro, no laptop awake. The SDK-54-vs-57 trap applies ONLY
+to Expo Go and does not exist for a standalone APK. Worth stating because the
+two get conflated, and the conflation makes the delivery path look harder than
+it is.
+
+### iOS — a money decision, not an engineering one
+The code is ready: `expo export --platform ios` produces a clean 3.94 MB
+bundle. The blocker is that **iOS has no sideloading at all**, so it needs the
+Apple Developer Program at **$99/year**. After that TestFlight is actually
+*smoother* than Android (store-style install, auto-updates, no warnings) and
+`expo-updates` works identically.
+
+⚠ **One thing to fix before any iOS build: `allowBackup: false` is
+Android-only.** On iOS the SQLite log sits where iCloud backs it up by
+default, so the exact privacy hole closed on Android would be open on iOS.
+`ios.bundleIdentifier` and `supportsTablet` are already set.
 
 ### One-time setup (done)
 - `eas.json` — `preview` profile, `distribution: internal`, `buildType: apk`
