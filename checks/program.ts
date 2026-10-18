@@ -97,7 +97,13 @@ ck('mild soreness changes nothing', resolveSession({...base,soreness:[{muscle:'c
 const rough=resolveSession({...base,feel:'rough'});
 ck('rough day cuts volume and caps effort', rough.globalVolume<1 && rough.maxRpe===7);
 ck('good day does NOT add volume', resolveSession({...base,feel:'good'}).globalVolume===1);
-ck('...it raises the ceiling instead', resolveSession({...base,feel:'good'}).maxRpe===9);
+// Was `maxRpe===9`, which passed while meaning nothing: maxRpe is a CAP and
+// every goal's own ceiling is already <=9, so min(goal, 9) never moved. A good
+// day now returns a BONUS the scheduler adds before capping.
+const good=resolveSession({...base,feel:'good'});
+ck('...it raises the ceiling instead', good.rpeBonus===1 && good.maxRpe===10, `bonus ${good.rpeBonus} cap ${good.maxRpe}`);
+ck('an ok day carries no bonus', resolveSession(base).rpeBonus===0);
+ck('a rough day carries no bonus', rough.rpeBonus===0);
 const long=resolveSession({...base,gapDays:30});
 ck('30-day gap → full body, half volume', long.dayType==='FB' && long.globalVolume===0.5);
 ck('14-day gap → lighter loads, same day', resolveSession({...base,gapDays:14}).loadScale===0.9);

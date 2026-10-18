@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, KeyboardAvoidingView, Platform, TouchableOpacity, Alert, ActivityIndicator, TextInput,
+  View, Text, ScrollView, StyleSheet, KeyboardAvoidingView, Platform, TouchableOpacity, Alert, ActivityIndicator, TextInput, BackHandler,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../constants/colors';
@@ -24,6 +24,7 @@ export default function WorkoutScreen({
 
 
   const [confirmSkip, setConfirmSkip] = useState<boolean>(false);
+  const [confirmLeave, setConfirmLeave] = useState<boolean>(false);
   const [busy, setBusy] = useState<boolean>(false);
 
   // The effect below re-runs whenever the projection refreshes. Without
@@ -76,6 +77,32 @@ export default function WorkoutScreen({
   const working = session.setLog.filter((s) => !s.isWarmup);
   const loggedCount = new Set(working.map((s) => s.exerciseId)).size;
   const canFinish = working.length > 0;
+
+  /**
+   * A LIVE SESSION DOES NOT LET YOU WALK OUT OF IT BY ACCIDENT.
+   *
+   * Asked for on 2026-10-02: "from that point to the complete end of a session
+   * the app should not get out… if I try to go back it should ask me whether
+   * you want to abandon this complete session or skip this entire schedule for
+   * today." I locked the Review screen instead and left this one open, so the
+   * Android back gesture silently exited a workout with sets already logged.
+   *
+   * Losing a logged session to a stray swipe is the worst thing a tester can
+   * experience, and it is unrecoverable from their side — they cannot tell
+   * whether the sets saved.
+   *
+   * Three ways out, all deliberate: finish it, leave it for later (the session
+   * stays `active` and Home offers Resume), or skip the day on the record.
+   */
+  React.useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (confirmSkip) { setConfirmSkip(false); return true; }
+      if (confirmLeave) { setConfirmLeave(false); return true; }
+      setConfirmLeave(true);
+      return true; // swallow it — the dialog is the only way out
+    });
+    return () => sub.remove();
+  }, [confirmSkip, confirmLeave]);
 
   // The rest timer was removed 2026-09-29 on the founder's instruction of
   // 2026-09-24 — "you do not know if in the gym or other place only he is the
@@ -295,7 +322,35 @@ export default function WorkoutScreen({
           </>
         )}
 
-        {!confirmSkip ? (
+        {confirmLeave && (
+          <View style={styles.confirmBox}>
+            <Text style={styles.confirmTitle}>Leave this session?</Text>
+            <Text style={styles.confirmSub}>
+              {working.length > 0
+                ? `${working.length} set${working.length === 1 ? '' : 's'} are already saved. Nothing is lost either way.`
+                : 'Nothing is logged yet.'}
+            </Text>
+            <PrimaryButton
+              title="Keep going"
+              onPress={() => setConfirmLeave(false)}
+              style={{ marginTop: 12 }}
+            />
+            <PrimaryButton
+              title="Leave it for now — I'll come back"
+              onPress={() => { setConfirmLeave(false); navigation.navigate('Home'); }}
+              variant="secondary"
+              style={{ marginTop: 8 }}
+            />
+            <PrimaryButton
+              title="Skip today altogether"
+              onPress={() => { setConfirmLeave(false); setConfirmSkip(true); }}
+              variant="secondary"
+              style={{ marginTop: 8 }}
+            />
+          </View>
+        )}
+
+        {!confirmSkip && !confirmLeave ? (
           <>
             <PrimaryButton
               title="Done"

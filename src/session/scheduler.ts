@@ -328,7 +328,9 @@ export function buildSessionDraft(input: ScheduleInput): ScheduledSessionDraft {
       name: ex.name,
       sets,
       targetReps: reps,
-      ...(params.maxRpe <= resolved.maxRpe ? { targetRpe: params.maxRpe } : { targetRpe: resolved.maxRpe }),
+      // The goal's ceiling, plus a good-day bonus, under the hard cap a rough
+      // day imposes. `min(params, resolved)` alone made 'good' a no-op.
+      targetRpe: Math.min(resolved.maxRpe, params.maxRpe + resolved.rpeBonus),
     });
   }
 

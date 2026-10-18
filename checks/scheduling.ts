@@ -58,6 +58,28 @@ const low=draft({equipment:'gym',checkin:{sessionId:'S',energy:2,soreness:[]}});
 ck('feeling rough cuts sets', (low.exercises[0]?.sets??9)<(gym.exercises[0]?.sets??0),
   `${low.exercises[0]?.sets} vs ${gym.exercises[0]?.sets}`);
 
+// ── B3: the three check-in buttons must mean three different things ──
+// The screen used to show ten dots and only <=3 vs >3 changed anything, so
+// seven of the ten were decoration. These are the exact values the three
+// buttons write. If any two collapse, the button is lying again.
+console.log('\nRough / OK / Good are three different sessions');
+const feels=[2,6,9].map(energy=>{
+  const d=draft({equipment:'gym',checkin:{sessionId:'S',energy,soreness:[]}});
+  const sets=d.exercises.reduce((n,e)=>n+e.sets,0);
+  const rpe=d.exercises[0]?.targetRpe ?? null;
+  console.log(`  energy ${energy} → ${d.exercises.length}ex ${sets}sets RPE ${rpe}`);
+  return {energy,sets,rpe};
+});
+ck('rough does less work than ok', feels[0]!.sets < feels[1]!.sets, `${feels[0]!.sets} vs ${feels[1]!.sets}`);
+ck('good does the SAME work as ok (no random-walk volume)', feels[1]!.sets === feels[2]!.sets);
+ck('...but at a higher ceiling', (feels[2]!.rpe??0) > (feels[1]!.rpe??0), `${feels[1]!.rpe} vs ${feels[2]!.rpe}`);
+ck('all three target RPEs are distinct', new Set(feels.map(x=>x.rpe)).size===3, feels.map(x=>x.rpe).join('/'));
+// A novice's ceiling is lower across the board, but still has three steps.
+const novFeels=[2,6,9].map(energy=>draft({equipment:'gym',experience:'new',
+  checkin:{sessionId:'S',energy,soreness:[]}}).exercises[0]?.targetRpe ?? null);
+ck('a novice also gets three distinct ceilings, all lower', new Set(novFeels).size===3
+  && novFeels.every((r,i)=>(r??0) <= (feels[i]!.rpe??0)), novFeels.join('/'));
+
 console.log('\nRotation cycles through the split');
 const days=[0,1,2].map(r=>draft({equipment:'gym',daysPerWeek:6,rotationIndex:r}).workoutName);
 ck('three different days in a row', new Set(days).size===3, days.join(' · '));

@@ -238,7 +238,10 @@ function RootNavigator(): React.ReactElement {
       <Stack.Screen
         name="Workout"
         component={WorkoutScreen}
-        options={{ title: '' }}
+        // No header arrow and no swipe-back while a session is live. The
+        // screen also traps the Android back button and offers three
+        // deliberate exits — see the BackHandler note in WorkoutScreen.
+        options={{ title: '', headerLeft: () => null, gestureEnabled: false }}
       />
 
       {/* No header back arrow and no swipe: the session is not saved until

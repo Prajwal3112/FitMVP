@@ -35,8 +35,22 @@ export type Resolved = {
   globalVolume: number;
   /** Load scaling after a long gap. */
   loadScale: number;
-  /** Ceiling on effort today. */
+  /** HARD ceiling on effort today. Only a rough day lowers it. */
   maxRpe: number;
+  /**
+   * Added to the goal's own RPE ceiling on a good day.
+   *
+   * It used to set `maxRpe = 9` directly, which did nothing: the scheduler
+   * takes `min(params.maxRpe, resolved.maxRpe)`, and `params.maxRpe` is 8 or 9
+   * for every goal, so params always won. Measured: sessions at energy 4 and
+   * energy 10 were byte-identical across all 30 goal x experience
+   * combinations. The documented design — "a good day raises the ceiling
+   * rather than adding volume" — was true of the comment and false of the app.
+   *
+   * A bonus composes correctly with a per-goal ceiling where an absolute
+   * number cannot.
+   */
+  rpeBonus: number;
   /** Why it looks like this, in the user's words. */
   reasons: string[];
   /** True when the split was overridden — the user should be told. */
@@ -82,6 +96,7 @@ export function resolveSession(input: ResolveInput): Resolved {
   let globalVolume = 1;
   let loadScale = 1;
   let maxRpe = 10;
+  let rpeBonus = 0;
   let overridden = false;
 
   // ── Step 0 — gap check, before anything else ──────────────────────
@@ -89,7 +104,7 @@ export function resolveSession(input: ResolveInput): Resolved {
     reasons.push("You've been away a while, so today is full body at half volume — getting the whole system moving again before we specialise.");
     return {
       dayType: 'FB', muscleVolume, globalVolume: 0.5, loadScale: 0.7,
-      maxRpe: 8, reasons, overridden: true,
+      maxRpe: 8, rpeBonus: 0, reasons, overridden: true,
     };
   }
   if (input.gapDays > 10) {
@@ -151,7 +166,7 @@ export function resolveSession(input: ResolveInput): Resolved {
     reasons.push('You are sore nearly everywhere. Today is light full-body movement — that is the session, not a consolation prize.');
     return {
       dayType: 'RECOVERY', muscleVolume, globalVolume: 0.4, loadScale: 0.7,
-      maxRpe: 6, reasons, overridden: true,
+      maxRpe: 6, rpeBonus: 0, reasons, overridden: true,
     };
   }
   // The "those sets are trimmed" line used to be pushed from here, off the
@@ -168,10 +183,11 @@ export function resolveSession(input: ResolveInput): Resolved {
     maxRpe = 7;
     reasons.push('Rough day — fewer sets, and we are not chasing hard ones.');
   } else if (input.feel === 'good') {
-    maxRpe = 9;
+    rpeBonus = 1;
+    reasons.push('Good day — same sets, but you can push the hard ones harder.');
   }
 
-  return { dayType, muscleVolume, globalVolume, loadScale, maxRpe, reasons, overridden };
+  return { dayType, muscleVolume, globalVolume, loadScale, maxRpe, rpeBonus, reasons, overridden };
 }
 
 /** Muscles each day type exists to train — bounds what may be added. */

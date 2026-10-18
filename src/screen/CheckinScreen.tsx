@@ -17,7 +17,16 @@ import type { RootStackScreenProps } from '../navigation/types';
 // session" and four chips shaped nothing. Now from the one vocabulary.
 const MUSCLES = SORENESS_AREAS;
 
-const ENERGY_VALUES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const;
+/**
+ * Each one says what it DOES, so the choice is informed rather than guessed.
+ * The effects are the real behaviour — verified: rough cuts volume to 12 sets
+ * and caps effort at RPE 7; good keeps the sets and raises the ceiling.
+ */
+const FEEL_OPTIONS = [
+  { value: 2, label: 'Rough', sub: 'Tired, stiff, slept badly', effect: 'Fewer sets, nothing heavy' },
+  { value: 6, label: 'OK', sub: 'Normal day', effect: 'The session as planned' },
+  { value: 9, label: 'Good', sub: 'Strong, ready', effect: 'Same sets, push the hard ones' },
+] as const;
 
 export default function CheckinScreen({
   navigation,
@@ -25,7 +34,9 @@ export default function CheckinScreen({
 }: RootStackScreenProps<'Checkin'>): React.ReactElement {
   const { submitCheckin } = useFitness();
 
-  const [energy, setEnergy] = useState<number>(7);
+  // 6 = the 'OK' button, so what is highlighted is what gets written. The
+  // old default of 7 highlighted nothing and wrote a value anyway.
+  const [energy, setEnergy] = useState<number>(6);
   const [soreness, setSoreness] = useState<Record<string, 1 | 2 | 3>>({});
   const [notes, setNotes] = useState<string>('');
   const [busy, setBusy] = useState<boolean>(false);
@@ -64,12 +75,6 @@ export default function CheckinScreen({
     }
   };
 
-  const energyLabel =
-    energy <= 3 ? 'Running on empty' :
-    energy <= 5 ? 'A bit flat' :
-    energy <= 7 ? 'Normal' :
-    'Ready to go';
-
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView
@@ -82,25 +87,31 @@ export default function CheckinScreen({
           Thirty seconds. This is what shapes today's session.
         </Text>
 
-        <Text style={styles.section}>ENERGY</Text>
-        <View style={styles.group}>
-          <View style={styles.energyCell}>
-            <View style={styles.energyRow}>
-              {ENERGY_VALUES.map((n) => (
-                <TouchableOpacity
-                  key={n}
-                  style={[styles.energyDot, energy === n && styles.energyDotOn]}
-                  onPress={() => setEnergy(n)}
-                  activeOpacity={0.6}
-                >
-                  <Text style={[styles.energyNum, energy === n && styles.energyNumOn]}>
-                    {n}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <Text style={styles.energyLabel}>{energyLabel}</Text>
-          </View>
+        {/* THREE BUTTONS, NOT TEN DOTS.
+            Ten numbers with no explanation, and measured: only <=3 vs >3
+            changed anything, so seven of the ten did nothing. The founder
+            flagged it on device — "what do you mean by energy levels, users
+            must understand what these numbers define" — and he was right
+            twice: it was unexplained AND it was fake.
+            The stored value stays a 1-10 number so historical events still
+            parse and mean the same thing; these three write 2, 6 and 9. */}
+        <Text style={styles.section}>HOW DO YOU FEEL?</Text>
+        <View style={styles.feelRow}>
+          {FEEL_OPTIONS.map((opt) => {
+            const on = energy === opt.value;
+            return (
+              <TouchableOpacity
+                key={opt.value}
+                style={[styles.feel, on && styles.feelOn]}
+                onPress={() => setEnergy(opt.value)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.feelLabel, on && styles.feelLabelOn]}>{opt.label}</Text>
+                <Text style={[styles.feelSub, on && styles.feelSubOn]}>{opt.sub}</Text>
+                <Text style={[styles.feelEffect, on && styles.feelSubOn]}>{opt.effect}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
         <Text style={styles.section}>SORE ANYWHERE?</Text>
@@ -171,25 +182,18 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     overflow: 'hidden',
   },
-  energyCell: { paddingHorizontal: 12, paddingVertical: 16 },
-  energyRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  energyDot: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.background,
+  feelRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  feel: {
+    flex: 1, minWidth: 96, minHeight: 112, backgroundColor: colors.card,
+    borderRadius: 12, borderWidth: 1, borderColor: colors.separator,
+    paddingHorizontal: 12, paddingVertical: 14, justifyContent: 'center',
   },
-  energyDotOn: { backgroundColor: colors.primary },
-  energyNum: { fontSize: 13, color: colors.textMuted, fontWeight: '500' },
-  energyNumOn: { color: '#fff', fontWeight: '700' },
-  energyLabel: {
-    fontSize: 14,
-    color: colors.textMuted,
-    textAlign: 'center',
-    marginTop: 14,
-  },
+  feelOn: { backgroundColor: colors.primary, borderColor: colors.primary },
+  feelLabel: { fontSize: 18, fontWeight: '700', color: colors.text },
+  feelLabelOn: { color: colors.onPrimary },
+  feelSub: { fontSize: 12, lineHeight: 16, color: colors.textMuted, marginTop: 4 },
+  feelSubOn: { color: colors.onPrimary, opacity: 0.82 },
+  feelEffect: { fontSize: 11, lineHeight: 15, color: colors.textTertiary, marginTop: 6 },
   chipWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
