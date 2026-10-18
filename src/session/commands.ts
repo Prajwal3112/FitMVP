@@ -8,13 +8,16 @@ import {
   draftSetCompleted,
   draftSetRemoved,
   draftExerciseSkipped,
+  draftExerciseSubstituted,
   draftSessionCompleted,
   draftSessionSkipped,
   draftSessionSummaryGenerated,
   type PreCheckinPayload,
   type SetCompletedPayload,
   type SkipReason,
+  type SubstitutionReason,
 } from '../events/session';
+import { canSwap } from './swap';
 import {
   selectSessionForDay,
   selectRotationIndex,
@@ -386,6 +389,57 @@ export async function skipExercise(
     rolloverHour: ctx.rolloverHour,
     ...(ctx.now ? { occurredAt: ctx.now } : {}),
   });
+}
+
+// ─── Swap ────────────────────────────────────────────────────────────
+
+/**
+ * Replace one exercise in a live session with another.
+ *
+ * `ExerciseSubstituted`'s first emitter. The schema, the projection reducer
+ * and the card's `swappedFrom` line all shipped in 7a and nothing ever wrote
+ * the event, so the whole path was dead — which is the failure mode this
+ * project keeps hitting, in its purest form.
+ *
+ * Guards live here, as every guard does: `canSwap` refuses once a set is
+ * logged against the slot, because the sets are keyed by exerciseId in an
+ * append-only log and swapping would orphan them onto a movement that is no
+ * longer in the session.
+ */
+export async function substituteExercise(
+  ctx: SessionContext,
+  sessionId: string,
+  originalExerciseId: string,
+  substituteExerciseId: string,
+  substituteName: string,
+  reason: SubstitutionReason,
+  reasonText?: string,
+): Promise<void> {
+  const session = requireSession(ctx, sessionId);
+  const blocked = canSwap(session, originalExerciseId);
+  if (blocked !== null) throw new InvariantViolation('bad_transition', blocked);
+  if (session.exercises.some((e) => e.exerciseId === substituteExerciseId)) {
+    throw new InvariantViolation(
+      'duplicate_exercise',
+      'That one is already in today\'s session.',
+    );
+  }
+  await appendEvent(
+    draftExerciseSubstituted({
+      sessionId,
+      originalExerciseId,
+      substituteExerciseId,
+      substituteName,
+      reason,
+      // The user asked for this one. Not the scheduler, and not an LLM.
+      proposedBy: 'user',
+      ...(reasonText !== undefined ? { reasonText } : {}),
+    }),
+    {
+      rolloverHour: ctx.rolloverHour,
+      ...(ctx.now ? { occurredAt: ctx.now } : {}),
+    },
+  );
 }
 
 // ─── Complete ────────────────────────────────────────────────────────

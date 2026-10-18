@@ -26,10 +26,14 @@ const SRC = join(ROOT, 'src');
 const KNOWN_ORPHANS = new Set([
   // Built for features that exist on the checklist and are not wired yet.
   'selectScheduleAdvice', 'ScheduleAdvice',          // 4.8 — never reaches a screen
-  'findSubstitutes', 'findSubstitutesTiered', 'findNonSoreAlternatives', // 2.5 mid-session swap
+  // WIRED 2026-10-18 (mid-session swap): findSubstitutesTiered and
+  // draftExerciseSubstituted now have consumers, so they are off this list.
+  // findSubstitutes is called BY findSubstitutesTiered, and
+  // findNonSoreAlternatives is still waiting for a caller.
+  'findSubstitutes', 'findNonSoreAlternatives',
   'successFraming', 'progressionStyle', 'goalFeasibility', 'progressionMode',
   'isCalibrationSession', 'lastPerformance', 'exerciseIdOf',
-  'draftGoalRevised', 'draftSessionResumed', 'draftExerciseSubstituted',
+  'draftGoalRevised', 'draftSessionResumed',
   'getTodaysWorkout', 'workouts', 'Workout',
   'isReadOnly', 'unreadableEventDetail',
   'parseBackup', 'describeBackup',                   // restore not implemented — see exportFile.ts

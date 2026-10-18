@@ -71,6 +71,9 @@ import { exportLogToFile, type ExportResult } from '../dev/exportFile';
 import {
   nutritionTargets, nutritionInputFrom, type NutritionTargets,
 } from '../nutrition/targets';
+import {
+  proposeSwaps, type SwapReason, type SwapOptions,
+} from '../session/swap';
 import { selectWhatWorks, selectWhatWorksGap, type Insight } from '../projections/whatWorks';
 import { APP_BUILD } from '../constants/build';
 import {
@@ -83,6 +86,7 @@ import {
   startSession,
   logSet,
   skipExercise,
+  substituteExercise,
   removeSet,
   completeSession,
   skipSession,
@@ -201,6 +205,12 @@ export type FitnessContextValue = {
   beginSession: (sessionId: string) => Promise<void>;
   recordSet: (input: Omit<LogSetInput, 'sessionId'> & { sessionId: string }) => Promise<void>;
   dropExercise: (sessionId: string, exerciseId: string) => Promise<void>;
+  /** Alternatives for one exercise in a live session, filtered as the scheduler filters. */
+  swapOptions: (sessionId: string, exerciseId: string, reason: SwapReason) => SwapOptions;
+  swapExercise: (
+    sessionId: string, exerciseId: string, toId: string, toName: string,
+    reason: SwapReason,
+  ) => Promise<void>;
   /** Requires the user's review — see completeSession. */
   finishSession: (sessionId: string, review: SessionReview) => Promise<void>;
   skipToday: (reason: SkipReason, notes?: string) => Promise<void>;
@@ -455,6 +465,54 @@ export const FitnessProvider: React.FC<{ children: ReactNode }> = ({ children })
   const dropExercise = useCallback(
     async (sessionId: string, exerciseId: string) => {
       await skipExercise(commandCtx(), sessionId, exerciseId);
+      await refreshProjections();
+    },
+    [commandCtx, refreshProjections],
+  );
+
+  /**
+   * The options for a mid-session swap, and the swap itself.
+   *
+   * `swapContext` hands the same filters the scheduler used — equipment
+   * owned, injuries, the beginner difficulty cap — so a user-chosen swap can
+   * never produce an exercise the scheduler would have refused to prescribe.
+   * A swap that bypassed §8.7 would be worse than offering no swap.
+   */
+  const swapContext = useCallback(
+    () => ({
+      equipment,
+      ...(ownedEquipment.length > 0 ? { ownedEquipment } : {}),
+      ...(injuries.length > 0 ? { injuries } : {}),
+      ...(experience === 'new' || experience === 'returning'
+        ? { beginnerOnly: true }
+        : {}),
+    }),
+    [equipment, ownedEquipment, injuries, experience],
+  );
+
+  const swapOptions = useCallback(
+    (sessionId: string, exerciseId: string, reason: SwapReason) => {
+      const session = sessionsRef.current.byId[sessionId];
+      if (session === undefined) {
+        return { ok: false as const, reason: 'That session is not open.' };
+      }
+      return proposeSwaps(session, exerciseId, reason, swapContext());
+    },
+    [swapContext],
+  );
+
+  const swapExercise = useCallback(
+    async (
+      sessionId: string, exerciseId: string, toId: string, toName: string,
+      reason: SwapReason,
+    ) => {
+      await substituteExercise(
+        commandCtx(), sessionId, exerciseId, toId, toName,
+        // The event's vocabulary is wider than the two reasons the screen
+        // offers; 'equipment' maps onto the schema's existing value rather
+        // than widening the enum for a synonym.
+        reason === 'pain' ? 'pain' : 'equipment_unavailable',
+      );
       await refreshProjections();
     },
     [commandCtx, refreshProjections],
@@ -742,6 +800,8 @@ export const FitnessProvider: React.FC<{ children: ReactNode }> = ({ children })
       recordSet,
       dropSet,
       dropExercise,
+      swapOptions,
+      swapExercise,
       finishSession,
       skipToday,
       devReload: refreshProjections,
@@ -782,6 +842,8 @@ export const FitnessProvider: React.FC<{ children: ReactNode }> = ({ children })
       recordSet,
       dropSet,
       dropExercise,
+      swapOptions,
+      swapExercise,
       finishSession,
       skipToday,
     ],

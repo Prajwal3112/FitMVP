@@ -40,6 +40,8 @@ export type ExerciseLogCardProps = {
   /** Take back a logged set. */
   onRemoveSet: (setIndex: number, isWarmup: boolean) => void;
   onSkip: () => void;
+  /** Open the swap sheet. Absent when this slot cannot be swapped. */
+  onSwap?: (() => void) | undefined;
 };
 
 type RowDraft = { weight: string; reps: string };
@@ -55,6 +57,7 @@ export const ExerciseLogCard: React.FC<ExerciseLogCardProps> = ({
   onLogSet,
   onRemoveSet,
   onSkip,
+  onSwap,
 }) => {
   const isHold = slot.targetDurationSec !== undefined;
 
@@ -382,9 +385,20 @@ export const ExerciseLogCard: React.FC<ExerciseLogCardProps> = ({
           )}
         </View>
         {!isSkipped && loggedSets.length === 0 && (
-          <TouchableOpacity onPress={onSkip} activeOpacity={0.6} hitSlop={8}>
-            <Text style={styles.skipLink}>Skip</Text>
-          </TouchableOpacity>
+          <View style={styles.actions}>
+            {/* SWAP BEFORE SKIP, deliberately. "The machine is taken" was the
+                first thing the founder hit in an hour of real use, and the
+                app's only answer was Skip — which drops the slot, loses the
+                volume, and tells the engine you avoided the movement. */}
+            {onSwap !== undefined && (
+              <TouchableOpacity onPress={onSwap} activeOpacity={0.6} hitSlop={8}>
+                <Text style={styles.swapLink}>Swap</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity onPress={onSkip} activeOpacity={0.6} hitSlop={8}>
+              <Text style={styles.skipLink}>Skip</Text>
+            </TouchableOpacity>
+          </View>
         )}
       </View>
 
@@ -446,6 +460,8 @@ const styles = StyleSheet.create({
   swapNote: { fontSize: 12, color: colors.primary, marginTop: 3 },
   suggestion: { fontSize: 13, color: colors.textMuted, marginTop: 5, lineHeight: 18 },
   suggestionUp: { color: colors.primary, fontWeight: '500' },
+  actions: { alignItems: 'flex-end', gap: 12 },
+  swapLink: { fontSize: 14, color: colors.primary, fontWeight: '600' },
   skipLink: { fontSize: 14, color: colors.textMuted },
   skippedNote: {
     fontSize: 14,

@@ -12,6 +12,7 @@ import { motivationalMessages } from '../constants/workouts';
 import { useFitness } from '../context/FitnessContext';
 import type { RootStackScreenProps } from '../navigation/types';
 import type { SkipReason } from '../events/session';
+import { canSwap, SWAP_REASONS, type SwapReason } from '../session/swap';
 
 export default function WorkoutScreen({
   navigation,
@@ -20,8 +21,18 @@ export default function WorkoutScreen({
   const {
     userData, todaysSession, currentDay, adherence, exerciseHistory, suggestions,
     beginSession, recordSet, dropSet, dropExercise, finishSession, skipToday,
+    swapOptions, swapExercise,
   } = useFitness();
 
+
+  // ── The swap sheet ──
+  // Which exercise is being swapped, and which reason the user picked. Reason
+  // first, because it inverts the ranking: `findSubstitutesTiered` ranks the
+  // same movement pattern highest for "can't get to it" ("your weights carry
+  // over") and PENALISES it for "it hurts" — a hurting shoulder should not be
+  // handed another press.
+  const [swapFor, setSwapFor] = useState<string | null>(null);
+  const [swapReason, setSwapReason] = useState<SwapReason | null>(null);
 
   const [confirmSkip, setConfirmSkip] = useState<boolean>(false);
   const [confirmLeave, setConfirmLeave] = useState<boolean>(false);
@@ -96,13 +107,14 @@ export default function WorkoutScreen({
    */
   React.useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (swapFor !== null) { setSwapFor(null); setSwapReason(null); return true; }
       if (confirmSkip) { setConfirmSkip(false); return true; }
       if (confirmLeave) { setConfirmLeave(false); return true; }
       setConfirmLeave(true);
       return true; // swallow it — the dialog is the only way out
     });
     return () => sub.remove();
-  }, [confirmSkip, confirmLeave]);
+  }, [confirmSkip, confirmLeave, swapFor]);
 
   // The rest timer was removed 2026-09-29 on the founder's instruction of
   // 2026-09-24 — "you do not know if in the gym or other place only he is the
@@ -115,6 +127,17 @@ export default function WorkoutScreen({
     void recordSet({ sessionId: session.sessionId, exerciseId, ...args })
       .catch((e: unknown) => {
         Alert.alert("Couldn't log that set", e instanceof Error ? e.message : String(e));
+      });
+  };
+
+  const handleSwap = (toId: string, toName: string) => {
+    if (swapFor === null || swapReason === null) return;
+    const from = swapFor;
+    setSwapFor(null);
+    setSwapReason(null);
+    void swapExercise(session.sessionId, from, toId, toName, swapReason)
+      .catch((e: unknown) => {
+        Alert.alert("Couldn't swap that", e instanceof Error ? e.message : String(e));
       });
   };
 
@@ -307,6 +330,14 @@ export default function WorkoutScreen({
                 });
               }}
               onSkip={handleSkipExercise(slot.exerciseId)}
+              // Offered only while the slot is still swappable. Once a set is
+              // logged the sets are keyed to this exerciseId in an append-only
+              // log, and swapping would orphan them onto another movement.
+              onSwap={
+                canSwap(session, slot.exerciseId) === null
+                  ? () => { setSwapFor(slot.exerciseId); setSwapReason(null); }
+                  : undefined
+              }
             />
           ))}
         </View>
@@ -362,6 +393,77 @@ export default function WorkoutScreen({
           </>
         )}
 
+        {/* SWAP. `ExerciseSubstituted`'s first path to being emitted: the
+            schema, the projection reducer and the card's `swappedFrom` line
+            all shipped in 7a and nothing ever wrote the event, so the whole
+            thing was dead end to end. */}
+        {swapFor !== null && (() => {
+          const slot = exercises.find((e) => e.exerciseId === swapFor);
+          const result = swapReason === null
+            ? null
+            : swapOptions(session.sessionId, swapFor, swapReason);
+          return (
+            <View style={styles.confirmBox}>
+              <Text style={styles.confirmTitle}>
+                {slot?.name ?? 'This exercise'} — what's wrong with it?
+              </Text>
+              {swapReason === null ? (
+                <>
+                  <Text style={styles.confirmSub}>
+                    The answer changes what I offer, so it is worth a tap.
+                  </Text>
+                  {SWAP_REASONS.map((r) => (
+                    <TouchableOpacity
+                      key={r.value}
+                      style={styles.swapReason}
+                      onPress={() => setSwapReason(r.value)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.swapReasonLabel}>{r.label}</Text>
+                      <Text style={styles.swapReasonSub}>{r.sub}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </>
+              ) : result !== null && result.ok ? (
+                <>
+                  <Text style={styles.confirmSub}>
+                    {swapReason === 'pain'
+                      ? 'Away from what hurts, best first.'
+                      : 'Closest movement first — your numbers carry over.'}
+                  </Text>
+                  {result.options.map((o) => (
+                    <TouchableOpacity
+                      key={o.exercise.id}
+                      style={styles.swapOption}
+                      onPress={() => handleSwap(o.exercise.id, o.exercise.name)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.swapOptionName}>{o.exercise.name}</Text>
+                      {/* The tier's own words. T1 "your weights carry over",
+                          T3 "start lighter" — the difference between a swap
+                          that keeps your history and one that discards it. */}
+                      <Text style={styles.swapOptionNote}>{o.note}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </>
+              ) : (
+                /* An honest dead end, not an empty list. Nothing safe exists
+                   for this muscle with this kit, and skipping it is the right
+                   call rather than a failure. */
+                <Text style={styles.confirmSub}>{result?.reason ?? ''}</Text>
+              )}
+              <PrimaryButton
+                title={swapReason === null ? 'Never mind' : 'Back'}
+                onPress={() => {
+                  if (swapReason === null) setSwapFor(null); else setSwapReason(null);
+                }}
+                variant="secondary"
+                style={{ marginTop: 12 }}
+              />
+            </View>
+          );
+        })()}
+
         {confirmLeave && (
           <View style={styles.confirmBox}>
             <Text style={styles.confirmTitle}>Leave this session?</Text>
@@ -390,7 +492,7 @@ export default function WorkoutScreen({
           </View>
         )}
 
-        {!confirmSkip && !confirmLeave ? (
+        {!confirmSkip && !confirmLeave && swapFor === null ? (
           <>
             <PrimaryButton
               title="Done"
@@ -558,6 +660,18 @@ const styles = StyleSheet.create({
   },
   skipBtn: { alignItems: 'center', paddingVertical: 14, marginTop: 4 },
   skipText: { fontSize: 15, color: colors.textMuted },
+  swapReason: {
+    backgroundColor: colors.raised, borderRadius: 10,
+    paddingHorizontal: 14, paddingVertical: 14, marginTop: 10, minHeight: 56,
+  },
+  swapReasonLabel: { fontSize: 16, fontWeight: '600', color: colors.text },
+  swapReasonSub: { fontSize: 13, color: colors.textMuted, marginTop: 3, lineHeight: 18 },
+  swapOption: {
+    backgroundColor: colors.raised, borderRadius: 10,
+    paddingHorizontal: 14, paddingVertical: 13, marginTop: 8, minHeight: 56,
+  },
+  swapOptionName: { fontSize: 16, fontWeight: '600', color: colors.text },
+  swapOptionNote: { fontSize: 12, color: colors.textMuted, marginTop: 3, lineHeight: 17 },
   confirmBox: {
     marginTop: 32,
     backgroundColor: colors.card,
